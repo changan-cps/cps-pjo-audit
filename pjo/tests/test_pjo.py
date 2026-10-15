@@ -88,6 +88,10 @@ class TemplateFidelityTests(Base):
             fresh = extract(f)
             t = PJOTemplate.objects.get(workshop__code=fresh["code"], version=1)
             self.assertEqual(t.content, fresh, f"{fresh['code']} differs from its source form")
+            pub = PJOTemplate.objects.get(workshop__code=fresh["code"], status="published")
+            for s in ("s1", "s2", "s3", "s4"):  # published questions are still exactly the source questions
+                self.assertEqual({k: v for k, v in pub.content[s].items() if k != "title"},
+                                 {k: v for k, v in fresh[s].items() if k != "title"})
 
     def test_phase2_question_counts(self):
         for code, n in EXPECTED_S3.items():
@@ -111,19 +115,39 @@ class TemplateFidelityTests(Base):
         self.assertEqual(self.audit.issues.count(), 0)
         self.assertEqual(self.audit.s3_answers.count(), 0)
 
-    def test_pt_battery_header_conflict_is_listed_not_hidden(self):
+    def test_pt_battery_header_corrected_as_new_version(self):
         from pjo.models import PendingItem
-        p = PendingItem.objects.get(code="P01-PT-BATTERY-TITLE")
-        self.assertEqual(p.status, "pending")
-        t = PJOTemplate.objects.get(workshop__code="PT_Battery", version=1).content
-        self.assertIn("PT Sub Line", t["s1"]["title"])  # shown as in the source, flagged pending
+        self.assertEqual(PendingItem.objects.get(code="P01-PT-BATTERY-TITLE").status, "resolved")
+        v1 = PJOTemplate.objects.get(workshop__code="PT_Battery", version=1)
+        v2 = PJOTemplate.objects.get(workshop__code="PT_Battery", status="published")
+        self.assertEqual((v1.status, v2.version), ("retired", 2))
+        self.assertIn("PT Sub Line", v1.content["s1"]["title"])  # source kept as imported
+        for s in ("s1", "s2", "s3", "s4"):
+            self.assertIn("(PT Battery)", v2.content[s]["title"])
+            self.assertNotIn("PT Sub Line", v2.content[s]["title"])
+        self.assertEqual(v1.content["s3"]["questions"], v2.content["s3"]["questions"])  # only the titles changed
+        # PT Sub Line Engine keeps its own title
+        self.assertIn("(PT Sub Line)", PJOTemplate.objects.get(workshop__code="PT_Sub_Line_Engine", status="published").content["s1"]["title"])
 
-    def test_gbr_not_used_until_confirmed(self):
-        self.assertIsNone(S.gbr_mapping())
+    def test_gbr_confirmed_and_derived_from_status(self):
+        self.assertEqual({k: S.gbr_mapping()[k] for k in "GBR"}, {"G": "Complete", "B": "On progress", "R": "Overdue"})
+        i, _ = S.record_finding(self.audit, self.auditor, sheet="s2", item_key="S2-A-1", occurrence=0, title="x",
+                                due_date=timezone.localdate() + timedelta(days=3))
+        self.assertEqual(i.gbr_auto, "B")
+        i.due_date = timezone.localdate() - timedelta(days=1)
+        self.assertEqual(i.gbr_auto, "R")
+        i.status = "closed"
+        self.assertEqual(i.gbr_auto, "G")
+
+    def test_confirmed_items_resolved_and_open_items_remain(self):
+        from pjo.models import PendingItem
+        open_codes = set(PendingItem.objects.filter(status="pending").values_list("code", flat=True))
+        self.assertEqual(open_codes, {"P04-NOTE-COLUMN", "P06-FREQUENCY", "P20-PT-BATTERY-TRUNCATED"})
 
     def test_setup_is_idempotent(self):
         call_command("setup_pjo", stdout=io.StringIO())
-        self.assertEqual(PJOTemplate.objects.count(), 7)
+        call_command("setup_pjo", stdout=io.StringIO())
+        self.assertEqual(PJOTemplate.objects.count(), 8)  # 7 sources + PT Battery corrected version
 
 
 class MarkAndIssueTests(Base):

@@ -2,7 +2,7 @@
 {% block title %}{{ i.issue_no }} · CPS PJO Audit{% endblock %}
 {% block content %}
 <div class="pagehead">
-  <div><h1>{{ i.issue_no }} <span class="badge b-{{ i.status }}">{{ i.status_th }}</span>{% if i.is_overdue %} <span class="badge b-overdue">เกินกำหนด</span>{% endif %}{% if i.is_repeat %} <span class="badge b-pending">พบซ้ำ {{ occurrences|length }} ครั้ง</span>{% endif %}</h1>
+  <div><h1>{{ i.issue_no }} <span class="badge b-{{ i.status }}">{{ i.status_th }}</span> <span class="badge gbr-{{ i.gbr_auto }}" title="G/B/R">{{ i.gbr_auto }}</span>{% if i.is_overdue %} <span class="badge b-overdue">เกินกำหนด</span>{% endif %}{% if i.is_repeat %} <span class="badge b-pending">พบซ้ำ {{ occurrences|length }} ครั้ง</span>{% endif %}</h1>
     <span class="muted">{{ i.get_issue_type_display }} · {{ i.workshop.name }}{% if i.team %} · {{ i.team }}{% endif %}{% if i.station %} · Station {{ i.station }}{% endif %}</span></div>
   {% if i.audit %}<a class="btn" href="{% url 'audit_form' i.audit.pk %}">← กลับไปที่ {{ i.audit.audit_no }}</a>{% endif %}
 </div>
@@ -33,9 +33,8 @@
     <div class="wide"><label for="rc">สาเหตุ</label><textarea id="rc" name="root_cause" {% if not can_work %}disabled{% endif %}>{{ i.root_cause }}</textarea></div>
     <div class="wide"><label for="pa">การแก้ไขถาวร</label><textarea id="pa" name="permanent_action" {% if not can_work %}disabled{% endif %}>{{ i.permanent_action }}</textarea></div>
     <div class="wide"><label for="ef">ผลตรวจประสิทธิผล (ผู้ตรวจยืนยัน)</label><textarea id="ef" name="effectiveness" {% if not can_verify %}disabled{% endif %}>{{ i.effectiveness }}</textarea></div>
-    <div><label>สถานะ G/B/R</label>
-      {% if gbr %}<select name="gbr"><option value="">-</option>{% for k, v in gbr.items %}<option value="{{ k }}" {% if i.gbr == k %}selected{% endif %}>{{ k }} = {{ v }}</option>{% endfor %}</select>
-      {% else %}<div class="box">รอผู้ดูแลยืนยันความหมาย G/B/R</div>{% endif %}</div>
+    <div><label>สถานะ G/B/R (คำนวณอัตโนมัติ)</label>
+      <div class="box"><span class="badge gbr-{{ i.gbr_auto }}">{{ i.gbr_auto }}</span> {% if i.gbr_auto == 'G' %}{{ gbr.G }}{% elif i.gbr_auto == 'R' %}{{ gbr.R }}{% else %}{{ gbr.B }}{% endif %}</div></div>
     <div class="wide"><label for="fs">แนบหลักฐานการแก้ไข (รูป/PDF)</label><input id="fs" type="file" name="files" multiple accept="image/*,application/pdf" {% if not can_work %}disabled{% endif %}></div>
   </div>
   {% if can_work or can_manage or can_verify %}<div class="btnrow" style="margin-top:10px"><button class="btn primary">บันทึก</button></div>{% endif %}

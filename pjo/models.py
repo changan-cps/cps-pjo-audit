@@ -28,6 +28,7 @@ class PJOTemplate(models.Model):
     status = models.CharField(max_length=12, choices=TemplateStatus.choices, default=TemplateStatus.DRAFT)
     content = models.JSONField()
     source_file = models.CharField(max_length=255, blank=True)
+    source_sha = models.CharField(max_length=64, blank=True, help_text="SHA-256 ของแม่แบบที่ดึงจากไฟล์ต้นฉบับ")
     change_note = models.TextField(blank=True)
     created_by = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
     created_at = models.DateTimeField(auto_now_add=True)
@@ -370,6 +371,13 @@ class Issue(models.Model):
     @property
     def is_overdue(self):
         return bool(self.due_date and self.status != IssueStatus.CLOSED and self.due_date < timezone.localdate())
+
+    @property
+    def gbr_auto(self):
+        """G/B/R as confirmed by the owner: G = Complete (closed), R = Overdue, B = On progress."""
+        if self.status == IssueStatus.CLOSED:
+            return "G"
+        return "R" if self.is_overdue else "B"
 
     @property
     def is_repeat(self):

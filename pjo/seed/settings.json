@@ -1,0 +1,9 @@
+[
+ {"key": "gbr_mapping",
+  "value": {"G": "Complete", "B": "On progress", "R": "Overdue",
+            "rule": "G = ปัญหาปิดแล้ว (Closed) · R = ยังไม่ปิดและเลยกำหนดเสร็จ · B = ยังไม่ปิดและยังไม่เลยกำหนด (Open / Assigned / In Progress / Pending Verification / Reopened)",
+            "confirmed": "ผู้ดูแลยืนยัน 15/10/2026"}},
+ {"key": "standard_precedence",
+  "value": {"rule": "ใช้แบบฟอร์ม Excel CATH-CPS009-B02 ของแต่ละ Workshop (มาตรฐานฉางอานระยอง) เป็นหลัก · PDF 002 Standardization ใช้เป็นเอกสารอ้างอิง",
+            "confirmed": "ผู้ดูแลยืนยัน 15/10/2026"}}
+]

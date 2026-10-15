@@ -23,7 +23,7 @@
 
 <h2>ความหมายสถานะ G / B / R</h2>
 <div class="card">
-  {% if gbr %}<p>G = {{ gbr.G }} · B = {{ gbr.B }} · R = {{ gbr.R }}</p>{% else %}<p class="notice">ยังไม่กำหนด ระบบจะไม่ใช้ G/B/R จนกว่าจะยืนยัน</p>{% endif %}
+  {% if gbr %}<p><span class="badge gbr-G">G</span> {{ gbr.G }} · <span class="badge gbr-B">B</span> {{ gbr.B }} · <span class="badge gbr-R">R</span> {{ gbr.R }}</p><p class="muted">{{ gbr.rule }} · {{ gbr.confirmed }}</p>{% else %}<p class="notice">ยังไม่กำหนด ระบบจะไม่ใช้ G/B/R จนกว่าจะยืนยัน</p>{% endif %}
   {% if is_admin %}<form method="post" action="{% url 'gbr_setting' %}" class="grid">{% csrf_token %}
     <div><label>G หมายถึง</label><input type="text" name="G" value="{{ gbr.G|default:'' }}"></div>
     <div><label>B หมายถึง</label><input type="text" name="B" value="{{ gbr.B|default:'' }}"></div>

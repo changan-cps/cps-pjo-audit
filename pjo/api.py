@@ -51,7 +51,7 @@ def _issue_brief(i):
     return {"id": i.id, "issue_no": i.issue_no, "title": i.title, "status": i.status, "status_th": i.status_th,
             "item_code": i.item_code, "station": i.station, "owner": i.owner_name or (i.owner.get_full_name() if i.owner else ""),
             "due_date": i.due_date.isoformat() if i.due_date else None, "overdue": i.is_overdue, "type": i.issue_type,
-            "fix": i.permanent_action or i.containment, "gbr": i.gbr}
+            "fix": i.permanent_action or i.containment, "gbr": i.gbr_auto}
 
 
 def audit_state(a, user):

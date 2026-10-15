@@ -1,0 +1,5 @@
+[
+ {"workshop": "PT_Battery", "code": "C01-PT-BATTERY-TITLE",
+  "change_note": "แก้หัวตาราง (PT Sub Line) เป็น (PT Battery) ทั้ง 4 ตาราง ตามที่ผู้ดูแลยืนยัน 15/10/2026 (รายการรอยืนยัน P01)",
+  "replace_in_titles": [["(PT Sub Line)", "(PT Battery)"]]}
+]

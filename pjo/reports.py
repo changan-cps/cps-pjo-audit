@@ -167,7 +167,7 @@ def issue_rows(qs):
              i.get_issue_type_display(), i.priority, i.title, i.description, i.attachments.count(), i.owner_name or str(i.owner or ""),
              i.due_date.isoformat() if i.due_date else "", i.containment, i.root_cause, i.permanent_action, i.effectiveness,
              str(i.verifier or ""), _dt(i.closed_at), i.status_th, "เกินกำหนด" if i.is_overdue else "", i.occurrences.count(),
-             i.gbr] for i in qs]
+             i.gbr_auto] for i in qs]
 
 
 ISSUE_HEADER = ["Issue ID", "Audit ID", "Workshop", "Team", "Station", "Model", "พนักงาน", "ระยะ/ตาราง", "รหัสข้อ", "ครั้งที่พบ",

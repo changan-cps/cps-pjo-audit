@@ -269,3 +269,8 @@ input:focus, select:focus, textarea:focus, .btn:focus-visible, button:focus-visi
 }
 body { overflow-wrap: break-word; }
 .src, .notice, .box, .kv b, .tbl td { overflow-wrap: anywhere; }
+
+/* G/B/R as confirmed: G Complete, B On progress, R Overdue (letter always shown with colour) */
+.gbr-G { background: #1d7a46; color: #fff; }
+.gbr-B { background: #1f4e8c; color: #fff; }
+.gbr-R { background: #b42318; color: #fff; }

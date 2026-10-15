@@ -179,7 +179,14 @@ def issues(request):
     wss, sel = _ws_filter(request)
     scope = [sel] if sel else list(wss)
     qs = Issue.objects.filter(Q(workshop__in=scope) | Q(owner=request.user)).select_related("workshop", "team", "owner", "audit").distinct()
-    f = {k: request.GET.get(k, "") for k in ("status", "team", "owner", "type", "due", "q", "overdue", "repeat", "mine")}
+    f = {k: request.GET.get(k, "") for k in ("status", "team", "owner", "type", "due", "q", "overdue", "repeat", "mine", "gbr")}
+    today = timezone.localdate()
+    if f["gbr"] == "G":
+        qs = qs.filter(status=IssueStatus.CLOSED)
+    elif f["gbr"] == "R":
+        qs = qs.exclude(status=IssueStatus.CLOSED).filter(due_date__lt=today)
+    elif f["gbr"] == "B":
+        qs = qs.exclude(status=IssueStatus.CLOSED).filter(Q(due_date__isnull=True) | Q(due_date__gte=today))
     if f["status"]:
         qs = qs.filter(status=f["status"])
     if f["team"]:
@@ -199,7 +206,7 @@ def issues(request):
     if f["q"]:
         qs = qs.filter(Q(issue_no__icontains=f["q"]) | Q(title__icontains=f["q"]) | Q(station__icontains=f["q"]))
     ctx = {"workshops": wss, "sel": sel, "issues": qs[:500], "f": f, "statuses": IssueStatus.choices, "status_th": ISSUE_STATUS_TH,
-           "types": IssueType.choices, "teams": Team.objects.filter(workshop__in=scope), "users": User.objects.filter(is_active=True)}
+           "types": IssueType.choices, "gbr": S.gbr_mapping(), "teams": Team.objects.filter(workshop__in=scope), "users": User.objects.filter(is_active=True)}
     return render(request, "pjo/issues.html", ctx)
 
 
@@ -231,9 +238,6 @@ def issue_detail(request, pk):
                     i.owner = User.objects.filter(pk=request.POST.get("owner") or 0).first()
                     if i.owner and not i.owner_name:
                         i.owner_name = i.owner.get_full_name() or i.owner.username
-                gbr = request.POST.get("gbr")
-                if gbr is not None and S.gbr_mapping():
-                    i.gbr = gbr if gbr in ("G", "B", "R") else ""
                 i.lock_version += 1
                 i.save()
                 i.events.create(action="updated", user=request.user, comment=", ".join(changed) or "บันทึก")
@@ -384,7 +388,7 @@ def gbr_setting(request):
     vals = {k: request.POST.get(k, "").strip() for k in ("G", "B", "R")}
     if all(vals.values()):
         s, _ = SystemSetting.objects.get_or_create(key="gbr_mapping")
-        s.value, s.updated_by = vals, request.user
+        s.value, s.updated_by = {**(s.value or {}), **vals}, request.user
         s.save()
         PendingItem.objects.filter(code="P02-GBR").update(status="resolved", resolution=json.dumps(vals, ensure_ascii=False),
                                                          resolved_by=request.user, resolved_at=timezone.now())

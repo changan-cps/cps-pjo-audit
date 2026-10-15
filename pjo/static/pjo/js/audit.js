@@ -569,7 +569,7 @@
       h('td', null, h('a', { href: '/issues/' + f.id + '/', text: f.issue_no }), ' ', f.title), h('td', { text: f.owner || '–' }),
       h('td', { text: f.fix || '–' }),
       h('td', null, h('span', { class: 'badge b-' + f.status, text: f.status_th }), ' ',
-        B.gbr ? h('span', { class: 'meta', text: f.gbr ? 'G/B/R: ' + f.gbr : 'G/B/R: ยังไม่ระบุ' }) : h('span', { class: 'meta', text: 'G/B/R: รอยืนยันความหมาย' })))));
+        B.gbr ? h('span', { class: 'badge gbr-' + f.gbr, title: B.gbr[f.gbr] || '', text: f.gbr + ' · ' + (B.gbr[f.gbr] || '') }) : h('span', { class: 'meta', text: 'G/B/R: รอยืนยันความหมาย' })))));
     if (!uniq.length) t.append(h('tr', null, h('td', { colspan: cols.length, class: 'muted', text: 'ยังไม่มีรายการ' })));
     box.append(h('div', { class: 'tablewrap' }, t));
     if (!locked) box.append(h('div', { class: 'btnrow', style: 'margin-top:8px' }, h('button', { type: 'button', class: 'btn', onclick: () => openFinding({ sheet: 's2', pickItem: true }) }, '+ เพิ่มแถว (บันทึกโอกาสปรับปรุง)')));
