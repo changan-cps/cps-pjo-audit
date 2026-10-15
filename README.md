@@ -119,3 +119,8 @@ pjo/static/pjo/js/audit.js   แบบฟอร์ม 4 ตาราง, autosav
 tools/             ตัวดึงแม่แบบและสร้าง Source Mapping
 source_docs/       แบบฟอร์ม Excel ต้นฉบับ 7 ไฟล์
 ```
+
+## ใช้งานโดยไม่มี server (Google Apps Script)
+
+เวอร์ชัน Google Apps Script อยู่ในโฟลเดอร์ [`apps-script/`](apps-script/) ใช้มาตรฐานและกติกาเดียวกับเวอร์ชัน Django
+ข้อมูลเก็บใน Google Sheet และ Google Drive ของบัญชีที่ติดตั้ง ดูวิธีติดตั้งได้ที่ [`apps-script/DEPLOY_TH.md`](apps-script/DEPLOY_TH.md)

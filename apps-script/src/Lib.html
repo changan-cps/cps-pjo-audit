@@ -1,0 +1,173 @@
+<script>
+/* Shared client library: server calls, small DOM helpers, modal/toast, Excel writer. */
+var PJO = window.PJO || {};
+(function () {
+  'use strict';
+  var mem = {};
+  PJO.store = {
+    get: function (k) { try { var v = localStorage.getItem(k); return v === null ? (k in mem ? mem[k] : null) : JSON.parse(v); } catch (e) { return k in mem ? mem[k] : null; } },
+    set: function (k, v) { mem[k] = v; try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch (e) { return false; } },
+    del: function (k) { delete mem[k]; try { localStorage.removeItem(k); } catch (e) { /* ignore */ } }
+  };
+
+  /** Call a server API. Resolves {ok, status, data}; rejects only on network failure. */
+  PJO.call = function (name, payload) {
+    return new Promise(function (resolve, reject) {
+      google.script.run
+        .withSuccessHandler(function (s) {
+          var r;
+          try { r = JSON.parse(s); } catch (e) { r = { ok: false, code: 'server', message: 'เซิร์ฟเวอร์ตอบกลับไม่ถูกต้อง' }; }
+          if (!r.ok && r.code === 'auth') { PJO.store.del('pjo-token'); if (PJO.onAuthLost) PJO.onAuthLost(r.message); }
+          if (!r.ok && r.code === 'must_change_pin' && PJO.onMustChangePin) PJO.onMustChangePin();
+          var status = r.ok ? 200 : (r.code === 'conflict' ? 409 : r.code === 'forbidden' ? 403 : 400);
+          var data = r.ok ? r.data : r;
+          resolve({ ok: !!r.ok, status: status, data: data });
+        })
+        .withFailureHandler(function (err) { reject(err); })
+        .api(name, PJO.store.get('pjo-token'), payload || {});
+    });
+  };
+  /** Call and unwrap; shows a toast on error. */
+  PJO.get = function (name, payload) {
+    return PJO.call(name, payload).then(function (r) {
+      if (!r.ok) { PJO.toast(r.data.message || 'ทำรายการไม่สำเร็จ', true); throw r; }
+      return r.data;
+    }, function (e) { PJO.toast('เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ (ออฟไลน์?)', true); throw e; });
+  };
+
+  PJO.h = function (tag, attrs) {
+    var el = document.createElement(tag);
+    if (attrs) Object.keys(attrs).forEach(function (k) {
+      var v = attrs[k];
+      if (v === null || v === undefined || v === false) return;
+      if (k === 'class') el.className = v;
+      else if (k === 'text') el.textContent = v;
+      else if (k.indexOf('on') === 0) el.addEventListener(k.slice(2), v);
+      else if (k === 'dataset') Object.assign(el.dataset, v);
+      else if (k === 'value') el.value = v;
+      else if (v === true) el.setAttribute(k, '');
+      else el.setAttribute(k, v);
+    });
+    for (var i = 2; i < arguments.length; i++) append_(el, arguments[i]);
+    return el;
+  };
+  function append_(el, kid) {
+    if (kid === null || kid === undefined || kid === false) return;
+    if (Array.isArray(kid)) { kid.forEach(function (k) { append_(el, k); }); return; }
+    el.append(kid instanceof Node ? kid : document.createTextNode(String(kid)));
+  }
+  PJO.toast = function (msg, err) {
+    var t = PJO.h('div', { class: 'toast' + (err ? ' err' : ''), role: 'alert', text: msg });
+    document.body.append(t);
+    setTimeout(function () { t.remove(); }, err ? 6000 : 3000);
+  };
+  PJO.modal = function (title, body, footer, opts) {
+    var h = PJO.h;
+    var ov = h('div', { class: 'overlay' + (opts && opts.sheet ? ' sheetmode' : ''), role: 'dialog', 'aria-modal': 'true', 'aria-label': title });
+    var close = function () { ov.remove(); if (opts && opts.onclose) opts.onclose(); };
+    var m = h('div', { class: 'modal' }, h('header', null, h('h2', { text: title }), h('button', { type: 'button', class: 'xbtn', 'aria-label': 'ปิด', onclick: close }, '×')),
+      h('div', { class: 'body' }, body), footer ? h('footer', null, footer) : null);
+    ov.append(m);
+    ov.addEventListener('keydown', function (e) { if (e.key === 'Escape') close(); });
+    document.body.append(ov);
+    var first = m.querySelector('input,textarea,select,button.primary');
+    if (first) setTimeout(function () { first.focus(); }, 30);
+    return { el: ov, close: close };
+  };
+  PJO.fmtDate = function (iso) { if (!iso) return '–'; var p = String(iso).slice(0, 10).split('-'); return p.length === 3 ? p[2] + '/' + p[1] + '/' + p[0] : iso; };
+  PJO.fmtDT = function (iso) {
+    if (!iso) return '';
+    try { return new Date(iso).toLocaleString('th-TH', { timeZone: 'Asia/Bangkok', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }); } catch (e) { return iso; }
+  };
+  PJO.today = function () { return new Date(Date.now() + 7 * 3600e3).toISOString().slice(0, 10); };
+  PJO.badge = function (cls, text, title) { return PJO.h('span', { class: 'badge ' + cls, text: text, title: title || null }); };
+
+  /** Read a File as base64 (images are shrunk to max 1600 px JPEG to keep uploads small). */
+  PJO.fileToPayload = function (file) {
+    return new Promise(function (resolve, reject) {
+      var rd = new FileReader();
+      rd.onerror = reject;
+      rd.onload = function () {
+        var url = rd.result;
+        if (!/^image\/(jpeg|png|webp)$/.test(file.type)) return resolve({ name: file.name, type: file.type, data: url.split(',')[1] });
+        var img = new Image();
+        img.onload = function () {
+          var s = Math.min(1, 1600 / Math.max(img.width, img.height));
+          var c = document.createElement('canvas');
+          c.width = Math.round(img.width * s); c.height = Math.round(img.height * s);
+          c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+          resolve({ name: file.name.replace(/\.\w+$/, '') + '.jpg', type: 'image/jpeg', data: c.toDataURL('image/jpeg', 0.85).split(',')[1] });
+        };
+        img.onerror = function () { resolve({ name: file.name, type: file.type, data: url.split(',')[1] }); };
+        img.src = url;
+      };
+      rd.readAsDataURL(file);
+    });
+  };
+
+  // ------------------------------------------------------------------ minimal XLSX writer
+  // Builds a real .xlsx (Office Open XML) with inline strings — no external library needed.
+  var CRC = (function () { var t = []; for (var n = 0; n < 256; n++) { var c = n; for (var k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+  function crc32(b) { var c = 0xFFFFFFFF; for (var i = 0; i < b.length; i++) c = CRC[(c ^ b[i]) & 0xFF] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; }
+  function zip(files) {
+    var enc = new TextEncoder(), parts = [], central = [], offset = 0;
+    files.forEach(function (f) {
+      var name = enc.encode(f.name), data = enc.encode(f.text), crc = crc32(data);
+      var lh = new DataView(new ArrayBuffer(30));
+      lh.setUint32(0, 0x04034b50, true); lh.setUint16(4, 20, true); lh.setUint16(6, 0x0800, true); lh.setUint16(8, 0, true);
+      lh.setUint32(14, crc, true); lh.setUint32(18, data.length, true); lh.setUint32(22, data.length, true); lh.setUint16(26, name.length, true);
+      parts.push(new Uint8Array(lh.buffer), name, data);
+      var ch = new DataView(new ArrayBuffer(46));
+      ch.setUint32(0, 0x02014b50, true); ch.setUint16(4, 20, true); ch.setUint16(6, 20, true); ch.setUint16(8, 0x0800, true);
+      ch.setUint32(16, crc, true); ch.setUint32(20, data.length, true); ch.setUint32(24, data.length, true); ch.setUint16(28, name.length, true);
+      ch.setUint32(42, offset, true);
+      central.push(new Uint8Array(ch.buffer), name);
+      offset += 30 + name.length + data.length;
+    });
+    var csize = central.reduce(function (s, a) { return s + a.length; }, 0);
+    var end = new DataView(new ArrayBuffer(22));
+    end.setUint32(0, 0x06054b50, true); end.setUint16(8, files.length, true); end.setUint16(10, files.length, true);
+    end.setUint32(12, csize, true); end.setUint32(16, offset, true);
+    return new Blob(parts.concat(central, [new Uint8Array(end.buffer)]), { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  }
+  function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, ''); }
+  function colName(i) { var s = ''; i++; while (i > 0) { var m = (i - 1) % 26; s = String.fromCharCode(65 + m) + s; i = Math.floor((i - 1) / 26); } return s; }
+  /** sheets: [{name, header:[...], rows:[[...]], widths:[...]}] */
+  PJO.xlsx = function (sheets) {
+    var files = [];
+    var XMLH = '<' + '?xml version="1.0" encoding="UTF-8" standalone="yes"?' + '>';
+    files.push({ name: '[Content_Types].xml', text: XMLH + '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>' +
+      sheets.map(function (s, i) { return '<Override PartName="/xl/worksheets/sheet' + (i + 1) + '.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'; }).join('') + '</Types>' });
+    files.push({ name: '_rels/.rels', text: XMLH + '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>' });
+    files.push({ name: 'xl/workbook.xml', text: XMLH + '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>' +
+      sheets.map(function (s, i) { return '<sheet name="' + esc(s.name.slice(0, 31)) + '" sheetId="' + (i + 1) + '" r:id="rId' + (i + 1) + '"/>'; }).join('') + '</sheets></workbook>' });
+    files.push({ name: 'xl/_rels/workbook.xml.rels', text: XMLH + '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+      sheets.map(function (s, i) { return '<Relationship Id="rId' + (i + 1) + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet' + (i + 1) + '.xml"/>'; }).join('') +
+      '<Relationship Id="rId' + (sheets.length + 1) + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>' });
+    files.push({ name: 'xl/styles.xml', text: XMLH + '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="Tahoma"/></font><font><b/><sz val="11"/><name val="Tahoma"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFDCE6F1"/></patternFill></fill></fills><borders count="2"><border/><border><left style="thin"><color rgb="FF999999"/></left><right style="thin"><color rgb="FF999999"/></right><top style="thin"><color rgb="FF999999"/></top><bottom style="thin"><color rgb="FF999999"/></bottom></border></borders><cellStyleXfs count="1"><xf/></cellStyleXfs><cellXfs count="3"><xf/><xf fontId="1" fillId="2" borderId="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment wrapText="1" vertical="top"/></xf><xf borderId="1" applyBorder="1" applyAlignment="1"><alignment wrapText="1" vertical="top"/></xf></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>' });
+    sheets.forEach(function (s, i) {
+      var rows = [s.header].concat(s.rows);
+      var xml = XMLH + '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>';
+      if (s.widths) xml += '<cols>' + s.widths.map(function (w, c) { return '<col min="' + (c + 1) + '" max="' + (c + 1) + '" width="' + w + '" customWidth="1"/>'; }).join('') + '</cols>';
+      xml += '<sheetData>' + rows.map(function (r, ri) {
+        return '<row r="' + (ri + 1) + '">' + r.map(function (v, ci) {
+          var ref = colName(ci) + (ri + 1), st = ri === 0 ? 1 : 2;
+          if (v === null || v === undefined || v === '') return '<c r="' + ref + '" s="' + st + '"/>';
+          if (typeof v === 'number' && isFinite(v)) return '<c r="' + ref + '" s="' + st + '"><v>' + v + '</v></c>';
+          return '<c r="' + ref + '" s="' + st + '" t="inlineStr"><is><t xml:space="preserve">' + esc(v) + '</t></is></c>';
+        }).join('') + '</row>';
+      }).join('') + '</sheetData></worksheet>';
+      files.push({ name: 'xl/worksheets/sheet' + (i + 1) + '.xml', text: xml });
+    });
+    return zip(files);
+  };
+  PJO.download = function (blob, filename) {
+    var url = URL.createObjectURL(blob);
+    var a = PJO.h('a', { href: url, download: filename });
+    document.body.append(a);
+    a.click();
+    setTimeout(function () { a.remove(); URL.revokeObjectURL(url); }, 4000);
+  };
+  window.PJO = PJO;
+})();
+</script>

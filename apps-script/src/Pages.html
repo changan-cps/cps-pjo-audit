@@ -1,0 +1,536 @@
+<script>
+/* Router, layout and every page except the audit form (Form) and print view (Print). */
+(function () {
+  'use strict';
+  var h = PJO.h, app = document.getElementById('app');
+  var S = PJO.session = { user: null, gbr: null, workshops: [], lookups: null };
+  var STATUS_TH = { draft: 'ร่าง', in_progress: 'กำลังตรวจ', pending_signatures: 'รอลงนาม', completed: 'ตรวจและลงนามครบ', amended: 'แก้ไขหลังลงนาม (รอลงนามใหม่)', cancelled: 'ยกเลิก' };
+  var ISSUE_ST = [['open', 'เปิด'], ['assigned', 'มอบหมายแล้ว'], ['in_progress', 'กำลังแก้ไข'], ['pending_verification', 'รอตรวจยืนยัน'], ['closed', 'ปิดแล้ว'], ['reopened', 'เปิดใหม่']];
+  var ISSUE_TYPES = [['major', 'ความผิดปกติหลัก'], ['minor', 'ความผิดปกติรอง'], ['improvement', 'โอกาสปรับปรุง (ตาราง 2)'], ['understanding', 'ความเข้าใจ (ตาราง 3)'], ['suggestion', 'ข้อเสนอแนะพนักงาน'], ['real_event', 'ความผิดปกติที่เกิดจริง (ตาราง 4)']];
+  var ROLE_TH = { admin: 'Admin', auditor: 'Auditor', tlgl: 'TL/GL', employee: 'Employee', issue_owner: 'Issue Owner', verifier: 'Verifier', viewer: 'Viewer' };
+
+  // ---------------------------------------------------------------- helpers
+  function go(hash) { if (location.hash === hash) PJO.route(); else location.hash = hash; }
+  PJO.go = go;
+  function q() { var out = {}; var s = (location.hash.split('?')[1] || ''); s.split('&').forEach(function (kv) { if (!kv) return; var p = kv.split('='); out[decodeURIComponent(p[0])] = decodeURIComponent(p[1] || ''); }); return out; }
+  function qs(o) { var p = Object.keys(o).filter(function (k) { return o[k]; }).map(function (k) { return encodeURIComponent(k) + '=' + encodeURIComponent(o[k]); }); return p.length ? '?' + p.join('&') : ''; }
+  function loading(el) { el.textContent = ''; el.append(h('div', { class: 'loading' }, h('div', { class: 'spinner' }), 'กำลังโหลด…')); }
+  function pagehead(title, sub, right) { return h('div', { class: 'pagehead' }, h('div', null, h('h1', { text: title }), sub ? h('span', { class: 'muted', text: sub }) : null), right || null); }
+  function sel(id, label, options, value, onchange) {
+    var s = h('select', { id: id, onchange: onchange || null });
+    options.forEach(function (o) { var opt = h('option', { value: o[0], text: o[1] }); if (String(o[0]) === String(value || '')) opt.selected = true; s.append(opt); });
+    return h('div', null, h('label', { for: id, text: label }), s);
+  }
+  function inp(id, label, type, value, attrs) { return h('div', attrs && attrs.wide ? { class: 'wide' } : null, h('label', { for: id, text: label }), h(type === 'textarea' ? 'textarea' : 'input', Object.assign({ id: id, type: type === 'textarea' ? null : type, value: value || '' }, attrs && attrs.input || {}))); }
+  function val(id) { var e = document.getElementById(id); return e ? (e.type === 'checkbox' ? e.checked : e.value) : ''; }
+  function table(head, rows, empty) {
+    var t = h('table', { class: 'tbl list' }, h('tr', null, head.map(function (x) { return h('th', { text: x }); })));
+    rows.forEach(function (r) { t.append(h('tr', null, r.map(function (c) { return h('td', null, c); }))); });
+    if (!rows.length) t.append(h('tr', null, h('td', { colspan: head.length, class: 'muted', text: empty || 'ไม่มีรายการ' })));
+    return h('div', { class: 'tablewrap' }, t);
+  }
+  function wsFilter(current, onchange) {
+    return h('div', { class: 'filters' }, sel('wsf', 'Workshop', [['', 'ทุก Workshop ที่มีสิทธิ์']].concat(S.workshops.map(function (w) { return [w.code, w.name]; })), current, onchange));
+  }
+  function auditLink(a) { return h('a', { href: '#/audit/' + a.id, text: a.audit_no }); }
+  function issueLink(i) { return h('a', { href: '#/issue/' + i.id, text: i.issue_no }); }
+  function gbrBadge(g) { return PJO.badge('gbr-' + g, g, S.gbr ? S.gbr[g] : ''); }
+  function lookups() { return S.lookups ? Promise.resolve(S.lookups) : PJO.get('lookups').then(function (d) { S.lookups = d; return d; }); }
+  function isAdmin() { return S.user && S.user.is_admin; }
+
+  // ---------------------------------------------------------------- login / shell
+  function loginPage(msg) {
+    app.textContent = '';
+    var f = h('form', { class: 'card', style: 'width:min(380px,100%)' },
+      h('h1', { text: 'CPS PJO Audit' }), h('p', { class: 'muted', text: 'Standardized Work → PJO · Changan Rayong' }),
+      msg ? h('div', { class: 'notice err', text: msg }) : null,
+      inp('lu', 'ชื่อผู้ใช้', 'text', '', { input: { autocomplete: 'username', autocapitalize: 'none', required: true } }),
+      inp('lp', 'PIN', 'password', '', { input: { inputmode: 'numeric', autocomplete: 'current-password', required: true } }),
+      h('button', { class: 'btn primary', style: 'width:100%;margin-top:12px', type: 'submit' }, 'เข้าสู่ระบบ'));
+    f.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var b = f.querySelector('button'); b.disabled = true;
+      PJO.call('login', { username: val('lu'), pin: val('lp') }).then(function (r) {
+        b.disabled = false;
+        if (!r.ok) { loginPage(r.data.message); return; }
+        PJO.store.set('pjo-token', r.data.token);
+        start();
+      }, function () { b.disabled = false; PJO.toast('เชื่อมต่อไม่ได้', true); });
+    });
+    app.append(h('div', { class: 'login' }, f));
+  }
+  PJO.onAuthLost = function (msg) { S.user = null; loginPage(msg || 'กรุณาเข้าสู่ระบบใหม่'); };
+  PJO.onMustChangePin = function () { pinPage(true); };
+
+  function pinPage(forced) {
+    var body = h('div', null, forced ? h('div', { class: 'notice', text: 'ใช้ PIN ชั่วคราวอยู่ กรุณาตั้ง PIN ใหม่ (ตัวเลข 6–8 หลัก)' }) : null,
+      forced ? null : inp('op', 'PIN เดิม', 'password', '', { input: { inputmode: 'numeric' } }),
+      inp('np', 'PIN ใหม่', 'password', '', { input: { inputmode: 'numeric' } }), inp('np2', 'ยืนยัน PIN ใหม่', 'password', '', { input: { inputmode: 'numeric' } }));
+    var ok = h('button', { type: 'button', class: 'btn primary' }, 'บันทึก PIN');
+    var m = PJO.modal('ตั้ง PIN ใหม่', body, forced ? [ok] : [h('button', { type: 'button', class: 'btn', onclick: function () { m.close(); } }, 'ยกเลิก'), ok]);
+    ok.addEventListener('click', function () {
+      if (val('np') !== val('np2')) { PJO.toast('PIN ใหม่ไม่ตรงกัน', true); return; }
+      PJO.get('change_pin', { old_pin: val('op'), new_pin: val('np') }).then(function () { m.close(); PJO.toast('ตั้ง PIN แล้ว'); start(); });
+    });
+  }
+
+  var NAV = [['#/', 'Dashboard'], ['#/plans', 'แผนและรายการตรวจ PJO'], ['#/start', 'เริ่มตรวจ PJO'], ['#/issues', 'ติดตามปัญหา'],
+    ['#/signatures', 'รายการรอลงนาม'], ['#/standards', 'จัดการแม่แบบและมาตรฐาน'], ['#/reports', 'รายงานและ Export']];
+  function shell() {
+    app.textContent = '';
+    var side = h('aside', { class: 'side', onclick: function (e) { if (e.target.tagName === 'A') side.classList.remove('open'); } },
+      h('div', { class: 'brandmark' }, 'CPS PJO Audit', h('small', { text: 'Standardized Work → PJO' })),
+      h('nav', { id: 'nav' }, NAV.concat(isAdmin() ? [['#/admin', 'ผู้ใช้และข้อมูลหลัก']] : []).map(function (n) { return h('a', { href: n[0], dataset: { r: n[0] }, text: n[1] }); })),
+      h('div', { class: 'who' }, h('b', { text: S.user.name }), (S.user.roles || []).map(function (r) { return ROLE_TH[r.role] + (r.workshop === 'ALL' ? '' : ' ' + r.workshop); }).join(', ') || 'ยังไม่มีบทบาท',
+        h('div', { class: 'btnrow', style: 'margin-top:8px' },
+          h('button', { class: 'btn small', type: 'button', onclick: function () { pinPage(false); } }, 'เปลี่ยน PIN'),
+          h('button', { class: 'btn small', type: 'button', onclick: function () { PJO.call('logout', {}); PJO.store.del('pjo-token'); loginPage(); } }, 'ออกจากระบบ'))));
+    app.append(h('div', { class: 'topbar' }, h('button', { type: 'button', 'aria-label': 'เมนู', onclick: function () { side.classList.toggle('open'); } }, '☰'), h('b', { text: 'CPS PJO Audit' })),
+      h('div', { class: 'shell' }, side, h('main', { class: 'main', id: 'main' })));
+  }
+  function setNav(r) {
+    document.querySelectorAll('#nav a').forEach(function (a) { a.classList.toggle('on', a.dataset.r === r); });
+  }
+
+  function start() {
+    if (!PJO.store.get('pjo-token')) { loginPage(); return; }
+    PJO.call('me', {}).then(function (r) {
+      if (!r.ok) { if (r.data.code !== 'auth') loginPage(r.data.message); return; }
+      S.user = r.data.user; S.gbr = r.data.gbr; S.workshops = r.data.workshops; S.lookups = null;
+      if (S.user.must_change_pin) { app.textContent = ''; pinPage(true); return; }
+      shell();
+      PJO.route();
+    }, function () { app.textContent = ''; app.append(h('div', { class: 'loading', text: 'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ กรุณาตรวจสอบอินเทอร์เน็ตแล้วโหลดหน้าใหม่' })); });
+  }
+
+  PJO.route = function () {
+    if (!S.user) return;
+    if (!document.getElementById('main')) shell();
+    var main = document.getElementById('main');
+    var path = location.hash.split('?')[0] || '#/';
+    var m;
+    window.scrollTo(0, 0);
+    if (path === '#/' || path === '#' || path === '') { setNav('#/'); return dashboard(main); }
+    if (path === '#/plans') { setNav('#/plans'); return plans(main); }
+    if (path === '#/start') { setNav('#/start'); return startAudit(main); }
+    if ((m = /^#\/audit\/(\d+)$/.exec(path))) { setNav('#/start'); return openAudit(main, m[1]); }
+    if (path === '#/issues') { setNav('#/issues'); return issues(main); }
+    if ((m = /^#\/issue\/(\d+)$/.exec(path))) { setNav('#/issues'); return issueDetail(main, m[1]); }
+    if (path === '#/signatures') { setNav('#/signatures'); return signatures(main); }
+    if (path === '#/standards') { setNav('#/standards'); return standards(main); }
+    if ((m = /^#\/standard\/(\d+)$/.exec(path))) { setNav('#/standards'); return standardDetail(main, m[1]); }
+    if (path === '#/reports') { setNav('#/reports'); return reports(main); }
+    if ((m = /^#\/print\/(\d+)$/.exec(path))) { setNav('#/reports'); return PJO.printAudit(main, m[1]); }
+    if (path === '#/admin') { setNav('#/admin'); return admin(main); }
+    main.textContent = 'ไม่พบหน้า';
+  };
+  window.addEventListener('hashchange', PJO.route);
+
+  // ---------------------------------------------------------------- dashboard
+  function tile(n, label, href, cls) { return h(href ? 'a' : 'div', { class: 'tile ' + (cls || ''), href: href || null }, h('div', { class: 'n', text: n }), h('div', { class: 'l' }, label)); }
+  function dashboard(main) {
+    var p = q();
+    loading(main);
+    PJO.get('dashboard', { workshop: p.workshop }).then(function (d) {
+      main.textContent = '';
+      main.append(pagehead('Dashboard', 'ข้อมูลจริงจากการตรวจในระบบ ไม่มีคะแนนรวม PJO', h('a', { class: 'btn primary', href: '#/start' }, '+ เริ่มตรวจ PJO')),
+        wsFilter(p.workshop, function (e) { go('#/' + qs({ workshop: e.target.value })); }),
+        h('h2', { text: 'แผนตรวจเดือนนี้' }),
+        h('div', { class: 'tiles' },
+          d.plan_total ? tile(d.plan_done + ' / ' + d.plan_total, 'ตรวจและลงนามครบ / แผน', '#/plans') : tile('–', 'ยังไม่มีแผนตรวจเดือนนี้ จึงไม่คำนวณความสำเร็จตามแผน'),
+          tile(d.in_progress, 'กำลังตรวจ / ร่าง', '#/plans?status=in_progress'), tile(d.pending_sig, 'รอลงนาม', '#/signatures', d.pending_sig ? 'warn' : ''),
+          tile(d.completed, 'ตรวจและลงนามครบ', '#/plans?status=completed'), tile(d.completed_open, 'ตรวจครบ แต่ยังมีปัญหาเปิด', null, d.completed_open ? 'warn' : '')),
+        h('h2', { text: 'ความผิดปกติ (ตาราง 1)' }),
+        h('div', { class: 'tiles' }, tile(d.major, [PJO.badge('b-major', 'หลัก'), ' จำนวนช่อง ×'], null, 'alert'), tile(d.minor, [PJO.badge('b-minor', 'รอง'), ' จำนวนช่อง ×'], null, 'warn'),
+          tile(d.fu_training, 'ความผิดปกติหลัก รอฝึกอบรม', '#/signatures', d.fu_training ? 'alert' : ''), tile(d.fu_recert, 'ฝึกอบรมแล้ว รอรับรองใหม่', '#/signatures', d.fu_recert ? 'warn' : '')),
+        h('h2', { text: 'ปัญหา' }),
+        h('div', { class: 'tiles' }, tile(d.issues_open, 'ยังไม่ปิด', '#/issues'), tile(d.issues_overdue, [gbrBadge('R'), ' เกินกำหนด'], '#/issues?gbr=R', d.issues_overdue ? 'alert' : ''),
+          tile(d.issues_verify, 'รอตรวจยืนยัน', '#/issues?status=pending_verification'), tile(d.issues_repeat, 'ปัญหาซ้ำ (พบมากกว่า 1 ครั้ง)', '#/issues?repeat=1')),
+        h('div', { class: 'grid', style: 'grid-template-columns:repeat(auto-fit,minmax(300px,1fr))' },
+          h('div', { class: 'card' }, h('h3', { text: 'ข้อที่พบ × บ่อย' }), table(['Workshop', 'ข้อ', 'ครั้ง'], d.top_items.map(function (x) { return [x.workshop, x.text + '…', String(x.n)]; }), 'ยังไม่มีข้อมูล')),
+          h('div', { class: 'card' }, h('h3', { text: 'ปัญหาเกินกำหนด' }), table(['Issue', 'รายละเอียด', 'Due'], d.overdue_list.map(function (i) { return [issueLink(i), i.title, PJO.fmtDate(i.due_date)]; }), 'ไม่มี'))),
+        h('div', { class: 'card' }, h('h3', { text: 'Audit ล่าสุด' }), table(['เลข Audit', 'วันที่', 'Workshop', 'Station', 'พนักงาน', 'สถานะ'],
+          d.recent.map(function (a) { return [auditLink(a), PJO.fmtDate(a.audit_date), a.workshop, a.station, a.employee_name, PJO.badge('b-' + a.status, a.status_th)]; }), 'ยังไม่มีการตรวจ')));
+    });
+  }
+
+  // ---------------------------------------------------------------- plans & audit list
+  function plans(main) {
+    var p = q();
+    loading(main);
+    Promise.all([PJO.get('plans', p), lookups()]).then(function (res) {
+      var d = res[0], lk = res[1];
+      main.textContent = '';
+      var canPlan = lk.workshops.filter(function (w) { return w.can_create; });
+      var form = h('form', { class: 'grid', style: 'margin-top:12px' },
+        sel('pw', 'Workshop', canPlan.map(function (w) { return [w.code, w.name]; }), p.workshop),
+        inp('pd', 'วันที่แผน', 'date', ''), sel('pt', 'Team', [['', '-']].concat(lk.teams.map(function (t) { return [t.id, t.workshop + ' / ' + t.name]; })), ''),
+        inp('ps', 'Station', 'text', ''), sel('pe', 'พนักงาน', [['', '-']].concat(lk.employees.map(function (e) { return [e.code, e.code + ' ' + e.name]; })), ''),
+        sel('pa', 'ผู้ตรวจ', [['', '-']].concat(lk.users.map(function (u) { return [u.username, u.name]; })), ''), inp('pn', 'หมายเหตุ', 'text', '', { wide: true }),
+        h('div', { style: 'align-self:end' }, h('button', { class: 'btn primary', type: 'submit' }, 'บันทึกแผน')));
+      form.addEventListener('submit', function (e) {
+        e.preventDefault();
+        PJO.get('plan_save', { workshop: val('pw'), planned_date: val('pd'), team_id: val('pt'), station: val('ps'), employee_code: val('pe'), auditor: val('pa'), note: val('pn') })
+          .then(function () { PJO.toast('เพิ่มแผนตรวจแล้ว'); PJO.route(); });
+      });
+      main.append(pagehead('แผนและรายการตรวจ PJO', null, h('a', { class: 'btn primary', href: '#/start' }, '+ เริ่มตรวจ PJO')),
+        wsFilter(p.workshop, function (e) { go('#/plans' + qs({ workshop: e.target.value })); }),
+        h('div', { class: 'card' }, h('h2', { style: 'margin-top:0', text: 'แผนตรวจ' }),
+          table(['วันที่แผน', 'Workshop', 'Station', 'พนักงาน', 'ผู้ตรวจ', 'ผล', ''], d.plans.map(function (pl) {
+            return [PJO.fmtDate(pl.planned_date), pl.workshop, pl.station, pl.employee_code, pl.auditor,
+              pl.audits.length ? h('span', null, pl.audits.map(function (a) { return h('span', null, auditLink(a), ' ', PJO.badge('b-' + a.status, a.status_th), h('br')); })) : h('span', { class: 'muted', text: 'ยังไม่ตรวจ' }),
+              h('span', { class: 'btnrow' }, h('a', { class: 'btn small', href: '#/start?plan=' + pl.id + '&workshop=' + pl.workshop + '&station=' + encodeURIComponent(pl.station) + '&employee=' + pl.employee_code + '&team=' + pl.team_id }, 'เริ่มตรวจ'),
+                h('button', { class: 'btn small danger', type: 'button', onclick: function () { if (confirm('ยกเลิกแผนนี้?')) PJO.get('plan_save', { workshop: pl.workshop, cancel_id: pl.id }).then(PJO.route); } }, 'ยกเลิก'))];
+          }), 'ยังไม่มีแผนตรวจ'),
+          canPlan.length ? h('details', { style: 'margin-top:12px' }, h('summary', { class: 'btn' }, '+ เพิ่มแผนตรวจ'), form) : null),
+        h('div', { class: 'card' }, h('h2', { style: 'margin-top:0', text: 'รายการตรวจ' }),
+          h('div', { class: 'filters' }, sel('fs', 'สถานะ', [['', 'ทั้งหมด']].concat(Object.keys(STATUS_TH).map(function (k) { return [k, STATUS_TH[k]]; })), p.status),
+            inp('fq', 'ค้นหา', 'search', p.q || ''), h('div', { style: 'align-self:end' }, h('button', { class: 'btn', type: 'button', onclick: function () { go('#/plans' + qs({ workshop: p.workshop, status: val('fs'), q: val('fq') })); } }, 'กรอง'))),
+          table(['เลข Audit', 'วันที่', 'Workshop', 'Station', 'พนักงาน', 'ผู้ตรวจ', 'Rev', 'สถานะ'], d.audits.map(function (a) {
+            return [auditLink(a), PJO.fmtDate(a.audit_date), a.workshop, a.station, a.employee_name, a.auditor, a.revision, PJO.badge('b-' + a.status, a.status_th)];
+          }))));
+    });
+  }
+
+  // ---------------------------------------------------------------- start audit
+  function startAudit(main) {
+    var p = q();
+    loading(main);
+    lookups().then(function (lk) {
+      main.textContent = '';
+      var ws = lk.workshops.filter(function (w) { return w.can_create; });
+      if (!ws.length) { main.append(pagehead('เริ่มตรวจ PJO'), h('div', { class: 'notice err', text: 'บัญชีนี้ยังไม่มีสิทธิ์ Auditor หรือ TL/GL ใน Workshop ใด ติดต่อ Admin' })); return; }
+      var chosen = p.workshop || '';
+      var cards = h('div', { class: 'grid', style: 'grid-template-columns:repeat(auto-fill,minmax(220px,1fr))' }, ws.map(function (w) {
+        var r = h('input', { type: 'radio', name: 'tpl', value: w.template ? w.template.id : '', disabled: !w.template, style: 'width:22px;height:22px;margin-top:3px', dataset: { ws: w.code } });
+        if (w.code === chosen && w.template) r.checked = true;
+        r.addEventListener('change', function () { chosen = w.code; filterOpts(); });
+        return h('label', { class: 'card', style: 'margin:0;cursor:pointer;display:flex;gap:10px;align-items:flex-start' + (w.template ? '' : ';opacity:.5') }, r,
+          h('span', null, h('b', { style: 'color:var(--ink)', text: w.name }), h('br'), h('small', { text: w.template ? w.template.label + ' · Published ' + PJO.fmtDate(w.template.published_at) : 'ยังไม่มีแม่แบบ Published' })));
+      }));
+      var team = sel('st_team', 'Team', [['', '-']].concat(lk.teams.map(function (t) { return [t.id, t.workshop + ' / ' + (t.group ? t.group + ' / ' : '') + t.name]; })), p.team);
+      var emp = sel('st_emp', 'พนักงานที่ถูกตรวจ', [['', '- เลือกจากรายชื่อ -']].concat(lk.employees.map(function (e) { return [e.code, e.code + ' ' + e.name]; })), p.employee);
+      function filterOpts() {
+        team.querySelectorAll('option').forEach(function (o) { var t = lk.teams.filter(function (x) { return x.id === o.value; })[0]; o.hidden = !!(t && chosen && t.workshop !== chosen); });
+        emp.querySelectorAll('option').forEach(function (o) { var e = lk.employees.filter(function (x) { return x.code === o.value; })[0]; o.hidden = !!(e && chosen && e.workshop !== chosen); });
+      }
+      filterOpts();
+      var form = h('form', { class: 'card' },
+        p.plan ? h('div', { class: 'notice info', text: 'เริ่มตรวจตามแผน' }) : null,
+        h('h2', { style: 'margin-top:0', text: '1. เลือก Workshop (แม่แบบมาตรฐาน)' }), cards,
+        h('h2', { text: '2. ข้อมูลส่วนหัว' }),
+        h('div', { class: 'grid' }, inp('st_date', 'วันที่', 'date', PJO.today()), sel('st_shift', 'กะ', [['', '-'], ['A', 'A'], ['B', 'B'], ['C', 'C'], ['Day', 'Day'], ['Night', 'Night']], ''),
+          team, inp('st_group', 'Group', 'text', ''), inp('st_line', 'Line', 'text', ''), inp('st_station', 'Station', 'text', p.station || ''), inp('st_model', 'Model', 'text', ''),
+          emp, inp('st_empname', 'หรือพิมพ์ชื่อพนักงาน', 'text', ''), inp('st_tlgl', 'TL/GL', 'text', ''), inp('st_ois', 'OIS/WES Revision', 'text', ''),
+          inp('st_oisurl', 'ลิงก์ OIS/WES (ถ้ามี)', 'url', '', { wide: true, input: { placeholder: 'https://' } })),
+        h('p', { class: 'muted', text: 'ผู้ตรวจ: ' + S.user.name + ' · Template Version บันทึกอัตโนมัติจากแม่แบบที่เลือก' }),
+        h('div', { class: 'btnrow' }, h('button', { class: 'btn primary', type: 'submit' }, 'สร้าง Audit และเปิดแบบฟอร์ม')));
+      form.addEventListener('submit', function (e) {
+        e.preventDefault();
+        var r = form.querySelector('input[name=tpl]:checked');
+        if (!r) { PJO.toast('เลือก Workshop', true); return; }
+        var b = form.querySelector('button[type=submit]'); b.disabled = true; b.textContent = 'กำลังสร้าง…';
+        PJO.get('audit_create', { template_id: r.value, plan_id: p.plan || '', header: { audit_date: val('st_date'), shift: val('st_shift'), team_id: val('st_team'), group: val('st_group'),
+          line: val('st_line'), station: val('st_station'), model: val('st_model'), employee_code: val('st_emp'), employee_name: val('st_empname'), tlgl_name: val('st_tlgl'),
+          ois_revision: val('st_ois'), ois_url: val('st_oisurl') } })
+          .then(function (d) { go('#/audit/' + d.id); }, function () { b.disabled = false; b.textContent = 'สร้าง Audit และเปิดแบบฟอร์ม'; });
+      });
+      main.append(pagehead('เริ่มตรวจ PJO'), form);
+    });
+  }
+
+  // ---------------------------------------------------------------- audit form
+  function openAudit(main, id) {
+    loading(main);
+    Promise.all([PJO.get('audit_open', { audit_id: id }), lookups()]).then(function (res) {
+      var d = res[0], lk = res[1];
+      main.textContent = '';
+      var snap = d.snapshot;
+      main.append(h('div', { class: 'formhead' },
+        h('div', { class: 'title' }, h('div', null, h('h1', { text: d.state.audit_no + ' · PJO ' + snap.name }),
+          h('span', { class: 'muted', text: snap.form_code + ' · แม่แบบ ' + d.meta.template_label + ' · ต้นฉบับ ' + snap.source_file })),
+          h('div', { class: 'btnrow' }, h('button', { type: 'button', class: 'btn', id: 'btnOis' }, 'เปิด OIS/WES'),
+            h('a', { class: 'btn', href: '#/print/' + id }, 'พิมพ์ / PDF'),
+            h('button', { type: 'button', class: 'btn', onclick: function () { PJO.exportAuditXlsx(id); } }, 'Excel'))),
+        d.pending_ws.map(function (x) { return h('div', { class: 'notice', style: 'margin:8px 14px' }, h('b', { text: 'รอยืนยัน: ' }), x.title); }),
+        d.pending_all.length ? h('details', { style: 'margin:6px 14px' }, h('summary', { class: 'muted', style: 'cursor:pointer;min-height:36px' }, 'ประเด็นรอยืนยันของมาตรฐาน ' + d.pending_all.length + ' รายการ'),
+          d.pending_all.map(function (x) { return h('div', { class: 'notice' }, h('b', { text: x.title }), ' ', h('span', { class: 'muted', text: x.detail })); })) : null,
+        h('details', { class: 'headtoggle', id: 'headToggle' }, h('summary', null, 'ข้อมูลส่วนหัว'), h('div', { class: 'fields', id: 'headerFields' }))),
+        h('div', { class: 'savebar' }, h('div', { class: 'btnrow' }, h('span', { class: 'badge', id: 'statusBadge' }), h('span', { id: 'flags' })),
+          h('div', { class: 'btnrow' }, h('span', { class: 'savestate', id: 'saveState', role: 'status', 'aria-live': 'polite' }, h('span', { class: 'dot' }), h('span', { class: 'txt', text: 'ข้อมูลตรงกับ server' })),
+            h('button', { type: 'button', class: 'btn small', id: 'btnSubmit' }, 'ตรวจเสร็จ ส่งลงนาม'), h('button', { type: 'button', class: 'btn small', id: 'btnSigs' }, 'ลงนาม'),
+            h('button', { type: 'button', class: 'btn small', id: 'btnAmend' }, 'ขอแก้ไขหลังลงนาม'), h('button', { type: 'button', class: 'btn small danger', id: 'btnCancel' }, 'ยกเลิก Audit'))),
+        h('div', { class: 'tabs', role: 'tablist', id: 'tabs' }), h('div', { class: 'sheet', id: 'sheet' }));
+      PJO.mountAudit({
+        snapshot: snap, state: d.state, meta: d.meta, employee: d.employee, gbr: d.gbr,
+        urls: { state: 'state', ops: 'ops', finding: 'finding', timing: 'timing', submit: 'submit', sign: 'sign', amend: 'amend', cancel: 'cancel', upload: 'upload', link_candidates: 'link_candidates' },
+        user: { id: S.user.username, name: S.user.name },
+        owners: lk.users.map(function (u) { return { id: u.username, name: u.name }; })
+      });
+    });
+  }
+
+  // ---------------------------------------------------------------- issues
+  function issues(main) {
+    var p = q();
+    loading(main);
+    Promise.all([PJO.get('issues', p), lookups()]).then(function (res) {
+      var d = res[0], lk = res[1];
+      main.textContent = '';
+      var gbrOpts = [['', 'ทั้งหมด']].concat(['G', 'B', 'R'].map(function (k) { return [k, k + (S.gbr ? ' · ' + S.gbr[k] : '')]; }));
+      var f = h('div', { class: 'filters card', style: 'padding:12px' },
+        sel('iw', 'Workshop', [['', 'ทั้งหมด']].concat(S.workshops.map(function (w) { return [w.code, w.name]; })), p.workshop),
+        sel('it', 'Team', [['', 'ทั้งหมด']].concat(lk.teams.map(function (t) { return [t.id, t.workshop + ' / ' + t.name]; })), p.team),
+        sel('io', 'ผู้รับผิดชอบ', [['', 'ทั้งหมด']].concat(lk.users.map(function (u) { return [u.username, u.name]; })), p.owner),
+        sel('is', 'สถานะ', [['', 'ทั้งหมด']].concat(ISSUE_ST), p.status), sel('ig', 'G/B/R', gbrOpts, p.gbr),
+        sel('ity', 'ประเภท', [['', 'ทั้งหมด']].concat(ISSUE_TYPES), p.type), inp('id', 'Due Date ไม่เกิน', 'date', p.due), inp('iq', 'ค้นหา', 'search', p.q),
+        h('div', null, ['repeat', 'mine'].map(function (k) { var c = h('input', { type: 'checkbox', id: 'ic_' + k }); c.checked = !!p[k]; return h('label', { style: 'display:flex;gap:6px;align-items:center' }, c, k === 'repeat' ? 'ปัญหาซ้ำ' : 'ของฉัน'); })),
+        h('div', { style: 'align-self:end' }, h('button', { class: 'btn primary', type: 'button', onclick: function () {
+          go('#/issues' + qs({ workshop: val('iw'), team: val('it'), owner: val('io'), status: val('is'), gbr: val('ig'), type: val('ity'), due: val('id'), q: val('iq'), repeat: val('ic_repeat') ? '1' : '', mine: val('ic_mine') ? '1' : '' }));
+        } }, 'กรอง')));
+      main.append(pagehead('ติดตามปัญหา', 'ปัญหาจากทั้ง 4 ตาราง · Open → Assigned → In Progress → Pending Verification → Closed',
+        h('button', { class: 'btn', type: 'button', onclick: function () { PJO.exportIssues(p); } }, 'Export Excel')), f,
+        table(['Issue ID', 'Workshop / Team', 'Station', 'ระยะ · ข้อ', 'ประเภท', 'รายละเอียด', 'ผู้รับผิดชอบ', 'Due Date', 'สถานะ', 'G/B/R', 'ต้นทาง'], d.issues.map(function (i) {
+          return [issueLink(i), h('span', null, i.workshop, i.team_name ? h('br') : null, i.team_name ? h('small', { text: i.team_name }) : null), i.station, (i.sheet || '').toUpperCase() + ' · ' + i.item_code, i.type_th, i.title,
+            i.owner_name || i.owner || '–', h('span', null, PJO.fmtDate(i.due_date), i.overdue ? h('br') : null, i.overdue ? PJO.badge('b-overdue', 'เกินกำหนด') : null),
+            PJO.badge('b-' + i.status, i.status_th), gbrBadge(i.gbr), i.audit_id ? h('a', { href: '#/audit/' + i.audit_id, text: 'Audit' }) : ''];
+        }), 'ไม่มีปัญหาตามเงื่อนไข'));
+    });
+  }
+
+  function issueDetail(main, id) {
+    loading(main);
+    Promise.all([PJO.get('issue_get', { issue_id: id }), lookups()]).then(function (res) {
+      var d = res[0], lk = res[1], i = d.issue;
+      main.textContent = '';
+      var dis = function (ok) { return ok ? null : true; };
+      var fld = function (k, label, type, ok) {
+        var el = h(type === 'textarea' ? 'textarea' : 'input', { id: 'f_' + k, type: type === 'textarea' ? null : type, disabled: dis(ok) });
+        el.value = i[k] || '';
+        return h('div', { class: type === 'textarea' ? 'wide' : null }, h('label', { for: 'f_' + k, text: label }), el);
+      };
+      var ownerSel = sel('f_owner', 'ผู้รับผิดชอบ (ผู้ใช้)', [['', '-']].concat(lk.users.map(function (u) { return [u.username, u.name]; })), i.owner);
+      if (!d.can_manage) ownerSel.querySelector('select').disabled = true;
+      var prio = sel('f_priority', 'ความสำคัญ', [['', '- ไม่ระบุ -'], ['สูง', 'สูง'], ['กลาง', 'กลาง'], ['ต่ำ', 'ต่ำ']], i.priority);
+      if (!d.can_manage) prio.querySelector('select').disabled = true;
+      var fileIn = h('input', { type: 'file', id: 'f_files', multiple: true, accept: 'image/*,application/pdf', disabled: dis(d.can_work) });
+      var form = h('div', { class: 'card' }, h('div', { class: 'grid' },
+        fld('title', 'รายละเอียดปัญหา', 'textarea', d.can_manage), fld('description', 'หมายเหตุ', 'textarea', d.can_manage), prio, ownerSel,
+        fld('owner_name', i.sheet === 's2' ? 'ผู้รับผิดชอบ (หน่วยงานที่รับผิดชอบการปรับปรุง)' : 'ผู้รับผิดชอบ (ชื่อ/หน่วยงาน)', 'text', d.can_manage), fld('due_date', 'Due Date', 'date', d.can_manage),
+        fld('containment', 'การแก้ไขทันที', 'textarea', d.can_work), fld('root_cause', 'สาเหตุ', 'textarea', d.can_work), fld('permanent_action', 'การแก้ไขถาวร', 'textarea', d.can_work),
+        fld('effectiveness', 'ผลตรวจประสิทธิผล (ผู้ตรวจยืนยัน)', 'textarea', d.can_verify),
+        h('div', null, h('label', { text: 'สถานะ G/B/R (คำนวณอัตโนมัติ)' }), h('div', { class: 'box' }, gbrBadge(i.gbr), ' ', S.gbr ? S.gbr[i.gbr] : '')),
+        h('div', { class: 'wide' }, h('label', { for: 'f_files', text: 'แนบหลักฐานการแก้ไข (รูป/PDF)' }), fileIn)),
+        (d.can_work || d.can_manage || d.can_verify) ? h('div', { class: 'btnrow', style: 'margin-top:10px' }, h('button', { class: 'btn primary', type: 'button', onclick: save }, 'บันทึก')) : null);
+      function save() {
+        var fields = {};
+        ['title', 'description', 'priority', 'owner', 'owner_name', 'due_date', 'containment', 'root_cause', 'permanent_action', 'effectiveness'].forEach(function (k) { fields[k] = val('f_' + k); });
+        PJO.get('issue_save', { issue_id: id, lock_version: i.lock_version, fields: fields }).then(function () {
+          var files = Array.prototype.slice.call(fileIn.files || []);
+          if (!files.length) return null;
+          return Promise.all(files.map(PJO.fileToPayload)).then(function (pl) { return PJO.get('upload', { issue_id: id, files: pl, purpose: 'fix_evidence' }); });
+        }).then(function () { PJO.toast('บันทึกแล้ว'); PJO.route(); });
+      }
+      var comment = h('input', { type: 'text', placeholder: 'ความเห็น / เหตุผล (จำเป็นเมื่อเปิดใหม่)', 'aria-label': 'ความเห็น', style: 'max-width:420px' });
+      function tr(to, label, cls) { return h('button', { class: 'btn ' + (cls || ''), type: 'button', onclick: function () {
+        PJO.get('issue_transition', { issue_id: id, to: to, comment: comment.value, lock_version: i.lock_version, effectiveness: val('f_effectiveness') }).then(function () { PJO.toast('เปลี่ยนสถานะแล้ว'); PJO.route(); });
+      } }, label); }
+      var st = i.status, wf = h('div', { class: 'btnrow' }, comment);
+      if ((st === 'open' || st === 'reopened') && d.can_manage) wf.append(tr('assigned', 'มอบหมาย'));
+      if ((st === 'assigned' || st === 'reopened') && d.can_work) wf.append(tr('in_progress', 'เริ่มแก้ไข'));
+      if (st === 'in_progress' && d.can_work) wf.append(tr('pending_verification', 'แจ้งแก้ไขเสร็จ (ส่งตรวจยืนยัน)', 'primary'));
+      if (st === 'pending_verification' && d.can_verify) { wf.append(tr('closed', 'ตรวจยืนยันและปิด', 'primary')); wf.append(tr('in_progress', 'ส่งกลับแก้ไข')); }
+      if (st === 'closed' && (d.can_manage || d.can_verify)) wf.append(tr('reopened', 'เปิดใหม่', 'danger'));
+      var atts = h('div', null, i.attachments.length ? i.attachments.map(function (a) {
+        return h('div', null, h('button', { class: 'btn small', type: 'button', onclick: function () {
+          PJO.get('attachment', { issue_id: id, file_id: a.id }).then(function (f) {
+            var body = /^image\//.test(f.mime) ? h('img', { src: f.data_url, alt: f.name, style: 'max-width:100%' }) : h('a', { href: f.data_url, download: f.name }, 'ดาวน์โหลด ' + f.name);
+            PJO.modal(f.name, body);
+          });
+        } }, a.name), ' ', h('small', { text: a.by + ' · ' + PJO.fmtDT(a.at) }));
+      }) : h('p', { class: 'muted', text: 'ไม่มีไฟล์แนบ' }));
+      main.append(
+        h('div', { class: 'pagehead' }, h('div', null, h('h1', null, i.issue_no, ' ', PJO.badge('b-' + i.status, i.status_th), ' ', gbrBadge(i.gbr), i.overdue ? [' ', PJO.badge('b-overdue', 'เกินกำหนด')] : null,
+          i.repeat ? [' ', PJO.badge('b-pending', 'พบซ้ำ ' + i.occurrences.length + ' ครั้ง')] : null),
+          h('span', { class: 'muted', text: i.type_th + ' · ' + i.workshop + (i.team_name ? ' · ' + i.team_name : '') + (i.station ? ' · Station ' + i.station : '') })),
+          i.audit_id ? h('a', { class: 'btn', href: '#/audit/' + i.audit_id }, '← กลับไปที่ ' + i.audit_no) : null),
+        h('div', { class: 'card' }, h('div', { class: 'kv' }, [['Audit ID', i.audit_no || '–'], ['ระยะ / ตาราง', (i.sheet || '–').toUpperCase()], ['รหัสข้อ', i.item_code || '–'], ['Model', i.model || '–'],
+          ['พนักงาน', i.employee_name || '–'], ['ผู้ยืนยัน', i.verifier || '–'], ['วันปิด', i.closed_at ? PJO.fmtDT(i.closed_at) : '–']].map(function (x) { return h('div', null, x[0], h('b', { text: x[1] })); }))),
+        d.followup ? h('div', { class: 'notice err' }, h('b', { text: 'ความผิดปกติหลัก: ' }), 'ติดตามการฝึกอบรมและการรับรองใหม่ในแบบฟอร์ม ', h('a', { href: '#/audit/' + d.followup.audit_id, text: d.followup.audit_no })) : null,
+        form, h('div', { class: 'card' }, h('h2', { style: 'margin-top:0', text: 'Workflow' }), wf,
+          st === 'pending_verification' && !d.can_verify ? h('p', { class: 'muted', text: 'รอผู้มีสิทธิ์ Verifier ตรวจยืนยันก่อนปิด' }) : null),
+        h('div', { class: 'card' }, h('h2', { style: 'margin-top:0', text: 'หลักฐาน' }), atts),
+        h('div', { class: 'card' }, h('h2', { style: 'margin-top:0', text: 'ประวัติการพบ' }), table(['วันเวลา', 'Audit', 'ตาราง', 'ข้อ / ครั้งที่', 'ผู้พบ', 'หมายเหตุ'], i.occurrences.map(function (o) {
+          return [PJO.fmtDT(o.found_at), o.audit_id ? h('a', { href: '#/audit/' + o.audit_id, text: o.audit_no }) : '', (o.sheet || '').toUpperCase(), o.item_key + (o.occurrence ? ' · ครั้งที่ ' + o.occurrence : ''), o.found_by,
+            h('span', null, o.note, o.mark_changed_note ? h('div', { class: 'notice', text: o.mark_changed_note }) : null)];
+        }))),
+        h('div', { class: 'card' }, h('h2', { style: 'margin-top:0', text: 'ประวัติการเปลี่ยนแปลง' }), table(['วันเวลา', 'ผู้ใช้', 'การกระทำ', 'สถานะ', 'ความเห็น'], i.events.map(function (e) {
+          return [PJO.fmtDT(e.at), e.user || 'ระบบ', e.action, (e.from || '') + (e.to ? ' → ' + e.to : ''), e.comment || ''];
+        }))));
+    });
+  }
+
+  // ---------------------------------------------------------------- signatures
+  function signatures(main) {
+    loading(main);
+    PJO.get('pending_signatures').then(function (d) {
+      main.textContent = '';
+      main.append(pagehead('รายการรอลงนาม'),
+        h('div', { class: 'card' }, h('h2', { style: 'margin-top:0', text: 'Audit ที่ยังลงนามไม่ครบ' }), table(['เลข Audit', 'Workshop', 'Station', 'พนักงาน', 'Rev', 'รอลงนาม', ''], d.rows.map(function (r) {
+          return [r.audit.audit_no, r.audit.workshop, r.audit.station, r.audit.employee_name, r.audit.revision, h('span', null, r.missing.map(function (m) { return [PJO.badge('b-pending', m.slice(0, 48)), ' ']; })),
+            h('a', { class: 'btn small primary', href: '#/audit/' + r.audit.id }, 'เปิดเพื่อลงนาม')];
+        }), 'ไม่มีรายการรอลงนาม')),
+        h('div', { class: 'card' }, h('h2', { style: 'margin-top:0', text: 'ความผิดปกติหลัก: รอฝึกอบรม / รอรับรองใหม่' }), table(['Audit', 'Issue', 'ข้อ · ครั้งที่', 'ขั้นตอน'], d.recert.map(function (f) {
+          return [h('a', { href: '#/audit/' + f.audit_id, text: f.audit_no }), h('a', { href: '#/issue/' + f.issue_id, text: f.issue_no }), f.item_key + ' · ' + f.occurrence, PJO.badge('b-major', f.stage_th)];
+        }))));
+    });
+  }
+
+  // ---------------------------------------------------------------- standards
+  function standards(main) {
+    loading(main);
+    PJO.get('templates').then(function (d) {
+      main.textContent = '';
+      var g = d.gbr || {};
+      var gbrForm = d.is_admin ? h('div', { class: 'grid' }, inp('g_G', 'G หมายถึง', 'text', g.G), inp('g_B', 'B หมายถึง', 'text', g.B), inp('g_R', 'R หมายถึง', 'text', g.R),
+        h('div', { style: 'align-self:end' }, h('button', { class: 'btn', type: 'button', onclick: function () { PJO.get('gbr_save', { G: val('g_G'), B: val('g_B'), R: val('g_R') }).then(function () { PJO.toast('บันทึกแล้ว'); PJO.route(); }); } }, 'บันทึกความหมาย G/B/R'))) : null;
+      main.append(pagehead('จัดการแม่แบบและมาตรฐาน', 'Draft → Published → Retired · Audit เก็บมาตรฐานฉบับที่ใช้ แก้แม่แบบใหม่ไม่กระทบ Audit เก่า'),
+        d.precedence ? h('div', { class: 'notice info', text: d.precedence.rule + ' · ' + d.precedence.confirmed }) : null,
+        table(['Workshop', 'เวอร์ชัน', 'ตาราง 1', 'ตาราง 2', 'ตาราง 3', 'ตาราง 4', 'ไฟล์ต้นฉบับ', 'ใช้ใน Audit'], d.templates.map(function (t) {
+          return [t.workshop, h('span', null, h('a', { href: '#/standard/' + t.id, text: 'v' + t.version }), ' ', PJO.badge('b-' + t.status, t.status)), t.counts.s1 + ' ข้อ', t.counts.s2, t.counts.s3 + ' ข้อ', t.counts.s4 + ' กรณี', h('small', { text: t.source_file }), String(t.audits)];
+        })),
+        h('h2', { text: 'ความหมายสถานะ G / B / R' }),
+        h('div', { class: 'card' }, S.gbr ? h('p', null, gbrBadge('G'), ' ', g.G, ' · ', gbrBadge('B'), ' ', g.B, ' · ', gbrBadge('R'), ' ', g.R) : h('p', { class: 'notice', text: 'ยังไม่กำหนด' }),
+          g.rule ? h('p', { class: 'muted', text: g.rule + ' · ' + (g.confirmed || '') }) : null, gbrForm),
+        h('h2', { text: 'รายการยืนยันมาตรฐาน' }),
+        d.pending.map(function (p) {
+          var res = h('input', { type: 'text', placeholder: 'บันทึกผลการยืนยันจากผู้ดูแลมาตรฐาน', 'aria-label': 'ผลการยืนยัน', style: 'max-width:520px' });
+          return h('div', { class: 'card' }, h('div', { class: 'btnrow', style: 'justify-content:space-between' }, h('b', { text: p.code + ' · ' + p.title }), PJO.badge(p.status === 'pending' ? 'b-pending' : 'b-closed', p.status === 'pending' ? 'รอยืนยัน' : 'ยืนยันแล้ว')),
+            h('p', { class: 'pre', text: p.detail }), h('div', { class: 'src', text: 'Workshop: ' + p.workshops + ' · แหล่งอ้างอิง: ' + p.sources.map(function (s) { return s.file + ' / ' + s.sheet + ' / ' + s.cell; }).join('; ') }),
+            p.status === 'resolved' ? h('div', { class: 'notice info', text: 'ผลการยืนยัน: ' + p.resolution }) :
+              (d.is_admin ? h('div', { class: 'btnrow', style: 'margin-top:8px' }, res, h('button', { class: 'btn small', type: 'button', onclick: function () { PJO.get('pending_resolve', { code: p.code, resolution: res.value }).then(PJO.route); } }, 'บันทึกการยืนยัน')) : null));
+        }));
+    });
+  }
+  function standardDetail(main, id) {
+    loading(main);
+    PJO.get('template_get', { template_id: id }).then(function (d) {
+      var t = d.template, c = d.content, edit = d.is_admin && t.status === 'draft';
+      main.textContent = '';
+      function act(action, extra) { return PJO.get('template_action', Object.assign({ template_id: id, action: action }, extra || {})); }
+      var actions = h('div', { class: 'card btnrow' });
+      if (d.is_admin) {
+        if (t.status === 'draft') {
+          var note = h('input', { type: 'text', placeholder: 'สิ่งที่เปลี่ยนแปลง *', 'aria-label': 'สิ่งที่เปลี่ยนแปลง', style: 'width:320px' });
+          actions.append(note, h('button', { class: 'btn primary', type: 'button', onclick: function () { if (confirm('เผยแพร่เวอร์ชันนี้? เวอร์ชันเดิมจะเป็น Retired (Audit เดิมไม่เปลี่ยน)')) act('publish', { change_note: note.value }).then(function () { PJO.toast('เผยแพร่แล้ว'); PJO.route(); }); } }, 'Publish'),
+            h('button', { class: 'btn danger', type: 'button', onclick: function () { act('delete_draft').then(function () { go('#/standards'); }); } }, 'ลบ Draft'));
+        } else {
+          actions.append(h('button', { class: 'btn', type: 'button', onclick: function () { act('new_draft').then(function (r) { go('#/standard/' + r.template_id); }); } }, 'สร้าง Draft ใหม่จากเวอร์ชันนี้'));
+          if (t.status === 'published') actions.append(h('button', { class: 'btn danger', type: 'button', onclick: function () { if (confirm('Retire เวอร์ชันนี้?')) act('retire').then(PJO.route); } }, 'Retire'));
+        }
+      }
+      function editor(key, text, expected, allowNa) {
+        if (!edit) return expected === undefined ? text : h('div', { class: 'grid', style: 'grid-template-columns:1fr 1fr' }, h('div', { text: text }), h('div', { class: 'pre', text: expected }));
+        var a = h('textarea', { 'aria-label': 'ข้อความ' }); a.value = text;
+        var b = expected !== undefined ? h('textarea', { 'aria-label': 'คำตอบที่คาดหวัง' }) : null; if (b) b.value = expected;
+        var na = allowNa !== undefined ? h('input', { type: 'checkbox' }) : null; if (na) na.checked = !!allowNa;
+        return h('div', null, a, b, na ? h('label', { style: 'display:flex;gap:6px;align-items:center' }, na, 'อนุญาต N/A') : null,
+          h('button', { class: 'btn small', type: 'button', onclick: function () { act('edit_item', { key: key, text: a.value, expected: b ? b.value : undefined, allow_na: na ? na.checked : undefined }).then(function () { PJO.toast('บันทึกแล้ว'); }); } }, 'บันทึก'));
+      }
+      main.append(pagehead(c.name + ' v' + t.version, c.form_code + ' · ต้นฉบับ ' + c.source_file + ' · ' + t.change_note, h('a', { class: 'btn', href: '#/standards' }, '← รายการแม่แบบ')), actions,
+        h('h2', { text: c.s1.sheet_name + ' · ระยะที่ 1 ส่วนที่ 1' }),
+        h('div', { class: 'card' }, h('div', { class: 'sheettitle', text: c.s1.title }), h('div', { class: 'resp' }, h('div', { class: 'maj', text: c.s1.major_response.text }), h('div', { class: 'min', text: c.s1.minor_response.text })),
+          table(['ข้อ', 'ประเภท', 'ข้อความ', 'N/A', 'แหล่งที่มา'], c.s1.items.map(function (i) {
+            return [String(i.no), h('span', null, PJO.badge('b-' + i.severity, i.severity === 'major' ? 'หลัก' : 'รอง'), i.kind === 'timing' ? ' ⏱' : ''), editor(i.key, i.text, undefined, i.allow_na), i.allow_na ? '✓' : '–', h('span', { class: 'src', text: i.source.sheet + '!' + i.source.cell })];
+          }))),
+        h('h2', { text: c.s2.sheet_name + ' · ระยะที่ 1 ส่วนที่ 2' }),
+        h('div', { class: 'card' }, h('div', { class: 'sheettitle', text: c.s2.title }), c.s2.sections.map(function (s) {
+          return h('div', null, h('h3', { text: s.title }), table(['รหัส', 'ข้อความ', 'Cell'], s.items.map(function (i) { return [i.code, editor(i.key, i.text), h('span', { class: 'src', text: i.source.cell })]; })));
+        }), h('div', { class: 'box', style: 'margin-top:8px', text: (c.s2.note || {}).text || '' })),
+        h('h2', { text: c.s3.sheet_name + ' · ระยะที่ 2' }),
+        h('div', { class: 'card' }, h('div', { class: 'sheettitle', text: c.s3.title }), table(['ข้อ', 'คำถาม / ระดับความเข้าใจที่คาดหวัง', 'แหล่งที่มา'], c.s3.questions.map(function (qq) {
+          return [String(qq.no), editor(qq.key, qq.text, qq.expected), h('span', { class: 'src', text: qq.source.cell + ' / ' + qq.expected_source.cell + (qq.expected_corrected_by ? ' · แก้ไข ' + qq.expected_corrected_by : '') })];
+        }))),
+        h('h2', { text: c.s4.sheet_name + ' · ระยะที่ 3' }),
+        h('div', { class: 'card' }, h('div', { class: 'sheettitle', text: c.s4.title }), table(['แนวทาง', 'กรณี / คำตอบที่พึงประสงค์', 'Cell'], c.s4.cases.map(function (k) {
+          return [k.category, editor(k.key, k.case, k.answer), h('span', { class: 'src', text: k.source.cell })];
+        }))),
+        (c.ignored_sample_values || []).length ? h('div', { class: 'card' }, h('h3', { text: 'ค่าตัวอย่างในไฟล์ที่ไม่ได้นำเข้า' }), c.ignored_sample_values.map(function (x) { return h('div', { class: 'src', text: x.source.sheet + '!' + x.source.cell + ' = “' + x.value + '”' }); })) : null);
+    });
+  }
+
+  // ---------------------------------------------------------------- reports
+  function reports(main) {
+    var p = q();
+    loading(main);
+    PJO.get('reports', p).then(function (d) {
+      main.textContent = '';
+      main.append(pagehead('รายงานและ Export', 'PDF: เปิดหน้า “พิมพ์ / PDF” แล้วเลือก Save as PDF (A4 แนวนอน)', h('button', { class: 'btn', type: 'button', onclick: function () { PJO.exportIssues({ workshop: p.workshop }); } }, 'ทะเบียนปัญหา (Excel)')),
+        h('div', { class: 'filters card', style: 'padding:12px' }, sel('rw', 'Workshop', [['', 'ทั้งหมด']].concat(S.workshops.map(function (w) { return [w.code, w.name]; })), p.workshop),
+          inp('rf', 'ตั้งแต่', 'date', p.from), inp('rt', 'ถึง', 'date', p.to),
+          h('div', { style: 'align-self:end' }, h('button', { class: 'btn primary', type: 'button', onclick: function () { go('#/reports' + qs({ workshop: val('rw'), from: val('rf'), to: val('rt') })); } }, 'กรอง'))),
+        table(['เลข Audit', 'วันที่', 'Workshop', 'Station', 'พนักงาน', 'Rev', 'สถานะ', 'Export'], d.audits.map(function (a) {
+          return [auditLink(a), PJO.fmtDate(a.audit_date), a.workshop, a.station, a.employee_name, a.revision, PJO.badge('b-' + a.status, a.status_th),
+            h('span', { class: 'btnrow' }, h('a', { class: 'btn small', href: '#/print/' + a.id }, 'พิมพ์ / PDF'), h('button', { class: 'btn small', type: 'button', onclick: function () { PJO.exportAuditXlsx(a.id); } }, 'Excel'))];
+        })));
+    });
+  }
+
+  // ---------------------------------------------------------------- admin
+  function admin(main) {
+    loading(main);
+    PJO.get('admin_data').then(function (d) {
+      main.textContent = '';
+      var wsOpts = [['ALL', 'ทุก Workshop']].concat(d.workshops.map(function (w) { return [w.code, w.name]; }));
+      function userForm(u) {
+        var roles = (u && u.roles || []).slice();
+        var list = h('div');
+        function draw() {
+          list.textContent = '';
+          roles.forEach(function (r, i) { list.append(h('div', { class: 'btnrow', style: 'margin:4px 0' }, PJO.badge('b-pending', ROLE_TH[r.role] + ' · ' + (r.workshop === 'ALL' ? 'ทุก Workshop' : r.workshop)), h('button', { class: 'btn small', type: 'button', onclick: function () { roles.splice(i, 1); draw(); } }, 'ลบ'))); });
+        }
+        draw();
+        var body = h('div', null, h('div', { class: 'grid' }, inp('u_name', 'ชื่อ-สกุล', 'text', u ? u.name : ''), inp('u_user', 'ชื่อผู้ใช้ (a-z 0-9)', 'text', u ? u.username : '', { input: { disabled: u ? true : null, autocapitalize: 'none' } })),
+          h('h3', { text: 'บทบาท' }), list,
+          h('div', { class: 'grid' }, sel('u_role', 'บทบาท', d.roles.map(function (r) { return [r, ROLE_TH[r]]; }), 'auditor'), sel('u_ws', 'Workshop', wsOpts, 'ALL'),
+            h('div', { style: 'align-self:end' }, h('button', { class: 'btn', type: 'button', onclick: function () { roles.push({ role: val('u_role'), workshop: val('u_ws') }); draw(); } }, '+ เพิ่มบทบาท'))),
+          u ? h('label', { style: 'display:flex;gap:6px;align-items:center;margin-top:8px' }, (function () { var c = h('input', { type: 'checkbox', id: 'u_active' }); c.checked = u.active; return c; })(), 'ใช้งานอยู่') : null);
+        var ok = h('button', { class: 'btn primary', type: 'button' }, 'บันทึก');
+        var m = PJO.modal(u ? 'แก้ไขผู้ใช้' : 'เพิ่มผู้ใช้', body, [h('button', { class: 'btn', type: 'button', onclick: function () { m.close(); } }, 'ยกเลิก'), ok]);
+        ok.addEventListener('click', function () {
+          PJO.get('admin_user_save', { username: u ? u.username : val('u_user'), name: val('u_name'), roles: roles, active: u ? val('u_active') : true }).then(function (r) {
+            m.close();
+            if (r.temp_pin) PJO.modal('PIN ชั่วคราว', h('div', null, h('p', null, 'ส่ง PIN นี้ให้ผู้ใช้ (แสดงครั้งเดียว): '), h('div', { class: 'sw-display', text: r.temp_pin }), h('p', { class: 'muted', text: 'ผู้ใช้ต้องตั้ง PIN ใหม่ตอนเข้าครั้งแรก' })));
+            PJO.route();
+          });
+        });
+      }
+      var empText = h('textarea', { id: 'emp_text', placeholder: 'วางจาก Excel: รหัส [Tab] ชื่อ-สกุล [Tab] Workshop [Tab] Team', style: 'min-height:120px' });
+      main.append(pagehead('ผู้ใช้และข้อมูลหลัก', 'เฉพาะ Admin'),
+        h('div', { class: 'card' }, h('div', { class: 'btnrow', style: 'justify-content:space-between' }, h('h2', { style: 'margin:0', text: 'ผู้ใช้' }), h('button', { class: 'btn primary', type: 'button', onclick: function () { userForm(null); } }, '+ เพิ่มผู้ใช้')),
+          table(['ชื่อผู้ใช้', 'ชื่อ', 'บทบาท', 'สถานะ', ''], d.users.map(function (u) {
+            return [u.username, u.name, u.roles.map(function (r) { return ROLE_TH[r.role] + ' ' + (r.workshop === 'ALL' ? '(ทุก WS)' : r.workshop); }).join(', '), u.active ? 'ใช้งาน' : 'ปิด',
+              h('span', { class: 'btnrow' }, h('button', { class: 'btn small', type: 'button', onclick: function () { userForm(u); } }, 'แก้ไข'),
+                h('button', { class: 'btn small', type: 'button', onclick: function () { if (confirm('รีเซ็ต PIN ของ ' + u.username + '?')) PJO.get('admin_reset_pin', { username: u.username }).then(function (r) { PJO.modal('PIN ชั่วคราว', h('div', { class: 'sw-display', text: r.temp_pin })); }); } }, 'รีเซ็ต PIN'))];
+          }))),
+        h('div', { class: 'card' }, h('h2', { style: 'margin-top:0', text: 'Team' }),
+          table(['Workshop', 'Group', 'Team', 'Line'], d.teams.map(function (t) { return [t.workshop, t.group, t.name, t.line]; }), 'ยังไม่มีทีม'),
+          h('div', { class: 'grid', style: 'margin-top:8px' }, sel('t_ws', 'Workshop', d.workshops.map(function (w) { return [w.code, w.name]; }), ''), inp('t_group', 'Group', 'text', ''), inp('t_name', 'Team', 'text', ''), inp('t_line', 'Line', 'text', ''),
+            h('div', { style: 'align-self:end' }, h('button', { class: 'btn', type: 'button', onclick: function () { PJO.get('admin_team_save', { workshop: val('t_ws'), group: val('t_group'), name: val('t_name'), line: val('t_line') }).then(function () { S.lookups = null; PJO.route(); }); } }, '+ เพิ่มทีม')))),
+        h('div', { class: 'card' }, h('h2', { style: 'margin-top:0', text: 'รายชื่อพนักงาน (' + d.employees.length + ')' }),
+          h('p', { class: 'muted', text: 'ใช้ยืนยันตัวตนตอนพนักงานเซ็น (รหัสพนักงาน + ผู้ตรวจเป็นพยาน) · ถ้าพนักงานมีบัญชีผู้ใช้ ให้ผูกชื่อผู้ใช้เพื่อเซ็นด้วยบัญชีตัวเองได้' }),
+          empText, h('div', { class: 'btnrow', style: 'margin-top:8px' }, h('button', { class: 'btn primary', type: 'button', onclick: function () {
+            PJO.get('admin_employees_import', { text: empText.value }).then(function (r) { PJO.toast('เพิ่ม ' + r.added + ' · ปรับปรุง ' + r.updated + (r.errors.length ? ' · ผิดพลาด ' + r.errors.length : '')); if (r.errors.length) PJO.modal('รายการที่นำเข้าไม่ได้', h('div', null, r.errors.map(function (e) { return h('div', { text: e }); }))); S.lookups = null; PJO.route(); });
+          } }, 'นำเข้า / ปรับปรุงรายชื่อ')),
+          table(['รหัส', 'ชื่อ', 'Workshop', 'Team', 'บัญชีผู้ใช้'], d.employees.slice(0, 500).map(function (e) {
+            var t = d.teams.filter(function (x) { return x.id === e.team_id; })[0];
+            var link = h('select', { 'aria-label': 'บัญชีผู้ใช้ของ ' + e.code, onchange: function (ev) { PJO.get('admin_employee_link', { code: e.code, username: ev.target.value }).then(function () { PJO.toast('บันทึกแล้ว'); }); } },
+              [h('option', { value: '', text: '-' })].concat(d.users.map(function (u) { var o = h('option', { value: u.username, text: u.username }); if (u.username === e.username) o.selected = true; return o; })));
+            return [e.code, e.name, e.workshop, t ? t.name : '', link];
+          }), 'ยังไม่มีรายชื่อ')));
+    });
+  }
+
+  start();
+})();
+</script>

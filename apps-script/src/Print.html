@@ -1,0 +1,194 @@
+<style>
+/* Print view: close to the paper CATH-CPS009-B02 form, A4 landscape */
+@page { size: A4 landscape; margin: 8mm; }
+.printdoc { font-size: 9.5pt; line-height: 1.35; color: #000; background: #fff; }
+.printdoc .pg { background: #fff; padding: 10px; margin-bottom: 16px; border: 1px solid var(--line-2); }
+.printdoc h1 { font-size: 12pt; text-align: center; margin: 0 0 4px; white-space: pre-line; }
+.printdoc h2 { font-size: 10.5pt; margin: 8px 0 4px; }
+.printdoc table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.printdoc th, .printdoc td { border: 0.6pt solid #333; padding: 2.5px 4px; vertical-align: top; overflow-wrap: anywhere; }
+.printdoc th { background: #dde5f0; }
+.printdoc thead { display: table-header-group; }
+.printdoc tr { page-break-inside: avoid; }
+.printdoc .c { text-align: center; } .printdoc .sec td { background: #eef2f7; font-weight: 700; }
+.printdoc .small { font-size: 8pt; color: #333; }
+.printdoc .sigbox { height: 46px; text-align: center; } .printdoc .sigbox img { max-height: 42px; max-width: 100%; }
+.printdoc .ok { color: #0a6b34; font-weight: 700; } .printdoc .ng { color: #b42318; font-weight: 700; }
+@media print { .printdoc .pg { border: 0; padding: 0; margin: 0; page-break-after: always; } .printdoc .pg:last-child { page-break-after: auto; } }
+</style>
+<script>
+(function () {
+  'use strict';
+  var h = PJO.h;
+  var SYM = { pass: '√', fail: '×', na: 'N/A' };
+  function T(head, rows, cols) {
+    var t = h('table');
+    if (cols) t.append(h('colgroup', null, cols.map(function (w) { return h('col', { style: w ? 'width:' + w : null }); })));
+    if (head) t.append(h('thead', null, h('tr', null, head.map(function (x) { return h('th', null, x); }))));
+    var tb = h('tbody');
+    rows.forEach(function (r) { tb.append(r instanceof Node ? r : h('tr', null, r.map(function (c) { return c instanceof Node ? c : h('td', null, c === null || c === undefined ? '' : String(c)); }))); });
+    t.append(tb);
+    return t;
+  }
+  function td(text, cls) { return h('td', { class: cls || null }, text); }
+  function markTd(v) { return td(v || '', 'c ' + (v === '√' ? 'ok' : (v && v.charAt(0) === '×' ? 'ng' : ''))); }
+  function sigCell(label, s) {
+    return h('td', { class: 'small' }, label, h('div', { class: 'sigbox' }, s ? [s.image ? h('img', { src: s.image, alt: '' }) : null, h('br'), s.signer_name + ' · ' + s.signed_at_th] : null));
+  }
+
+  PJO.printAudit = function (main, id) {
+    main.textContent = '';
+    main.append(h('div', { class: 'loading' }, h('div', { class: 'spinner' }), 'กำลังเตรียมเอกสาร…'));
+    PJO.get('audit_export', { audit_id: id, with_images: true }).then(function (d) {
+      var a = d.audit, sn = d.snapshot, hd = a.header;
+      var sig = {}; d.signatures.filter(function (s) { return !s.followup_id; }).forEach(function (s) { sig[s.role] = s; });
+      var n = sn.s1.frequency_count || 12, occs = []; for (var i = 1; i <= n; i++) occs.push(i);
+      var timing = {}; d.timing.filter(function (t) { return !t.discarded; }).forEach(function (t) { timing[t.observation] = t; });
+      var lab = {}; (sn.s1.labels || []).forEach(function (l) { lab[l.role] = l.text; });
+      var doc = h('div', { class: 'printdoc' });
+      // ---- sheet 1
+      var rows = [h('tr', { class: 'sec' }, h('td', { colspan: n + 1 }, sn.s1.major_response.text))];
+      var seenMinor = false;
+      sn.s1.items.forEach(function (it) {
+        if (it.severity === 'minor' && !seenMinor) { seenMinor = true; rows.push(h('tr', { class: 'sec' }, h('td', { colspan: n + 1 }, sn.s1.minor_response.text))); }
+        rows.push(h('tr', null, td(it.text), occs.map(function (o) {
+          var m = a.marks[it.key + '|' + o], v = m ? SYM[m.v] : '';
+          if (it.kind === 'timing' && timing[o] && timing[o].avg !== null) v = (v ? v + ' ' : '') + timing[o].avg.toFixed(1) + 's';
+          return markTd(v);
+        })));
+      });
+      var oisBox = hd.ois_current === 'yes' ? '☑ Yes ☐ No' : hd.ois_current === 'no' ? '☐ Yes ☑ No' : '☐ Yes ☐ No';
+      var s1issues = d.issues.filter(function (x) { return x.sheet === 's1'; });
+      var tlist = d.timing.filter(function (t) { return !t.discarded; });
+      doc.append(h('div', { class: 'pg' }, h('h1', { text: sn.s1.title }),
+        T(null, [[h('td', null, h('b', null, 'เลข Audit: '), a.audit_no + ' Rev ' + a.revision), h('td', null, h('b', null, 'วันที่: '), PJO.fmtDate(hd.audit_date)), h('td', null, h('b', null, 'กะ: '), hd.shift),
+          h('td', null, h('b', null, 'Workshop: '), sn.name), h('td', null, h('b', null, 'Group/Team: '), (hd.group || '') + ' ' + (d.team || '')), h('td', null, h('b', null, 'Line: '), hd.line)],
+          [h('td', null, h('b', null, 'Station: '), hd.station), h('td', null, h('b', null, 'Model: '), hd.model), h('td', { colspan: 2 }, h('b', null, 'พนักงานที่ถูกสังเกต: '), hd.employee_name),
+            h('td', null, h('b', null, 'ผู้ตรวจสอบ: '), a.auditor_name || a.auditor), h('td', null, h('b', null, 'TL/GL: '), hd.tlgl_name)],
+          [h('td', { colspan: 2 }, h('b', null, 'แม่แบบ: '), a.template_label), h('td', { colspan: 2 }, h('b', null, 'OIS/WES Revision: '), hd.ois_revision),
+            h('td', { colspan: 2 }, h('b', null, sn.s1.ois_check.text.slice(0, 60) + ' '), oisBox)]]),
+        h('div', { class: 'small', text: sn.s1.legend.fail + ' · ' + sn.s1.legend.pass + ' · ' + sn.s1.legend.na + ' · ช่องว่าง = ยังไม่ได้ตรวจ' }),
+        T([sn.s1.frequency_label].concat(occs.map(String)), rows, ['34%']),
+        tlist.length ? [h('h2', { text: 'การจับเวลา (วินาที รวมเวลาเดิน)' }), T(['ครั้งที่สังเกต', 'รอบที่ใช้/ทั้งหมด', 'เฉลี่ย', 'ต่ำสุด', 'สูงสุด', 'Standard Time', 'Takt Time', 'ผลประเมิน', 'รอบที่ไม่ใช้ / Manual / หยุดชั่วคราว'],
+          tlist.map(function (t) {
+            return [t.observation, t.count_used + '/' + t.count_total, t.avg === null ? '' : t.avg.toFixed(2), t.min === null ? '' : t.min.toFixed(2), t.max === null ? '' : t.max.toFixed(2),
+              (t.standard_time || 'ไม่ระบุ') + ' ' + t.standard_time_source, (t.takt_time || 'ไม่ระบุ') + ' ' + t.takt_time_source, t.evaluation,
+              t.laps.filter(function (l) { return !l.valid || l.source === 'manual' || l.paused; }).map(function (l) {
+                return 'รอบ ' + l.lap_no + ' ' + l.seconds.toFixed(2) + 's' + (!l.valid ? ' ไม่ใช้: ' + l.invalid_reason : '') + (l.source === 'manual' ? ' Manual: ' + l.manual_reason : '') + (l.paused ? ' หยุด ' + l.paused.toFixed(2) + 's (' + l.pause_reasons.join(', ') + ')' : '');
+              }).join('; ')];
+          }))] : null,
+        h('h2', { text: 'ปัญหาที่พบจากการสังเกต' }),
+        T(['Issue', 'ข้อ / ครั้งที่', 'รายละเอียด', 'ผู้รับผิดชอบ', 'สถานะ'], s1issues.length ? s1issues.map(function (x) {
+          return [x.issue_no, x.occurrences.filter(function (o) { return o.audit_id === a.id; }).map(function (o) { return o.item_key + ' · ' + o.occurrence; }).join(', '), x.title, x.owner_name, x.status_th];
+        }) : [['ไม่มี', '', '', '', '']], ['12%', '14%', null, '14%', '10%']),
+        a.followups.length ? [h('h2', { text: 'การตอบสนองความผิดปกติหลัก' }), T(['ข้อ/ครั้งที่', 'แจ้งหัวหน้า', 'การจัดการทันที', 'ฝึกอบรม', 'ตรวจรับรองใหม่', 'สถานะ'], a.followups.map(function (f) {
+          return [f.item_key + ' · ' + f.occurrence, f.supervisor_notified || '', f.immediate_action || '', (f.training_by || '') + ' ' + (f.training_detail || ''), (f.recert_by || '') + ' ' + (f.recert_result || ''),
+            { open: 'รอดำเนินการ', trained: 'ฝึกอบรมแล้ว รอรับรองใหม่', recertified: 'รับรองใหม่แล้ว' }[f.stage]];
+        }))] : null,
+        T(null, [h('tr', null, sigCell(lab.employee_major || 'พนักงานยืนยันความผิดปกติหลัก', sig.employee_major), sigCell(lab.employee_minor || 'พนักงานยืนยันความผิดปกติรอง', sig.employee_minor),
+          h('td', { class: 'small' }, lab.employee_recert || 'ลายเซ็นหลังรับรองใหม่', h('div', null, d.signatures.filter(function (s) { return s.followup_id; }).map(function (s) { return h('div', null, s.role_th + ': ' + s.signer_name + ' ' + s.signed_at_th); }))))])));
+      // ---- sheet 2
+      var s2rows = [];
+      sn.s2.sections.forEach(function (sec) {
+        s2rows.push(h('tr', { class: 'sec' }, h('td', { colspan: 3 }, sec.title)));
+        sec.items.forEach(function (it) { var m = a.marks[it.key + '|0']; s2rows.push([it.code, it.text, m ? SYM[m.v] : '']); });
+      });
+      var s2issues = d.issues.filter(function (x) { return x.sheet === 's2'; });
+      doc.append(h('div', { class: 'pg' }, h('h1', { text: sn.s2.title }), T(null, s2rows.map(function (r) { return r instanceof Node ? r : h('tr', null, td(r[0], 'c'), td(r[1]), markTd(r[2])); }), ['8%', null, '8%']),
+        h('h2', { text: (sn.s2.log_title || {}).text || 'บันทึกโอกาสการปรับปรุงที่เป็นไปได้:' }),
+        T(sn.s2.table_columns.map(function (c) { return c.text === 'ผู้รับผิดชอบ' ? 'ผู้รับผิดชอบ (หน่วยงาน)' : c.text; }), s2issues.length ? s2issues.map(function (x, k) {
+          return [k + 1, x.item_code, x.issue_no + ' ' + x.title, x.owner_name, x.permanent_action || x.containment, x.status_th + (d.gbr ? ' · ' + x.gbr : '')];
+        }) : [['', '', 'ไม่มี', '', '', '']]),
+        h('p', { class: 'small pre', text: (sn.s2.note || {}).text || '' })));
+      // ---- sheet 3
+      doc.append(h('div', { class: 'pg' }, h('h1', { text: sn.s3.title }), h('p', { class: 'small pre', text: sn.s3.goal.text }),
+        T(['#', sn.s3.col_question, sn.s3.col_expected, 'คำตอบพนักงาน', 'ก่อนสอน', 'สิ่งที่ชี้แนะ', 'หลังสอน', 'ผู้ประเมิน'], sn.s3.questions.map(function (qq) {
+          var x = a.s3[qq.key] || {};
+          return h('tr', null, td(String(qq.no), 'c'), td(qq.text), td(qq.expected, 'pre'), td(x.employee_answer || ''), markTd(SYM[x.before] || ''), td(x.coaching || ''), markTd(SYM[x.after] || ''),
+            td(x.by ? x.by + ' ' + PJO.fmtDT(x.at) : '', 'small'));
+        }), ['3%', '21%', '21%', '17%', '5%', '17%', '5%', '11%']),
+        h('h2', { text: sn.s3.suggestion_title.text }),
+        T(sn.s3.suggestion_columns.map(function (c) { return c.text; }), a.suggestions.length ? a.suggestions.map(function (g, k) { return [k + 1, g.description, g.suggestion, g.owner_name]; }) : [['', 'ไม่มี', '', '']]),
+        T(null, [h('tr', null, sigCell(sn.s3.signature.text, sig.supervisor_s3), sigCell('ลายเซ็นของพนักงาน', sig.employee_s3))])));
+      // ---- sheet 4
+      var cases = {}; a.s4.forEach(function (r) { if (r.case_key) cases[r.case_key] = r; });
+      var lastCat = null;
+      doc.append(h('div', { class: 'pg' }, h('h1', { text: sn.s4.title }), h('p', { class: 'small pre', text: sn.s4.goal.text }),
+        T(null, [sn.s4.steps.map(function (s) { return s.no + '. ' + s.text; })]),
+        h('h2', { text: sn.s4.discussion_title.text }),
+        T(sn.s4.columns.concat(['คำตอบจริง', 'การชี้แนะ', 'ผล']), sn.s4.cases.map(function (c) {
+          var r = cases[c.key] || {}, cat = c.category !== lastCat ? c.category : ''; lastCat = c.category;
+          return h('tr', null, td(cat, 'pre'), td(c.case), td(c.answer), td(r.employee_answer || ''), td(r.coaching || ''), markTd(SYM[r.result] || ''));
+        }), ['13%', '17%', '22%', '20%', '22%', '6%']),
+        h('h2', { text: sn.s4.record_title.text }),
+        T(['ประเภท', sn.s4.record_columns[0], 'คำตอบ/การจัดการ', 'การชี้แนะ', sn.s4.record_columns[1], 'Issue'], a.s4.filter(function (r) { return !r.case_key; }).map(function (r) {
+          var iss = d.issues.filter(function (x) { return x.id === r.issue_id; })[0];
+          return [r.is_real_event ? 'เกิดขึ้นจริง' : 'สถานการณ์สมมติ', r.case_text, r.employee_answer, r.coaching, r.improvement, iss ? iss.issue_no : ''];
+        })),
+        T(null, [h('tr', null, sigCell('ผู้ตรวจสอบรับรองผลตรวจทั้ง 4 ตาราง', sig.auditor),
+          h('td', { class: 'small' }, 'สถานะ: ' + d.status_th + ' · Rev ' + a.revision,
+            a.revisions.map(function (r) { return h('div', { text: 'Rev ' + r.revision + ' → ' + (r.revision + 1) + ': ' + r.reason + ' (' + r.by + ' ' + PJO.fmtDT(r.at) + ')' }); }),
+            h('div', { text: 'พิมพ์เมื่อ ' + d.printed_at + ' (Asia/Bangkok) · แม่แบบ ' + a.template_label + ' · ต้นฉบับ ' + sn.source_file })))])));
+      main.textContent = '';
+      main.append(h('div', { class: 'btnrow noprint', style: 'margin-bottom:10px' }, h('a', { class: 'btn', href: '#/audit/' + id }, '← กลับไปที่แบบฟอร์ม'),
+        h('button', { class: 'btn primary', type: 'button', onclick: function () { window.print(); } }, 'พิมพ์ / บันทึกเป็น PDF'),
+        h('span', { class: 'muted', text: 'เลือกเครื่องพิมพ์ “Save as PDF” และกระดาษ A4 แนวนอน' })), doc);
+    });
+  };
+
+  // ------------------------------------------------------------------ Excel
+  var ISSUE_HEAD = ['Issue ID', 'Audit ID', 'Workshop', 'Team', 'Station', 'Model', 'พนักงาน', 'ระยะ/ตาราง', 'รหัสข้อ', 'ครั้งที่พบ', 'ประเภทปัญหา', 'ความสำคัญ', 'หัวข้อ', 'รายละเอียด',
+    'จำนวนหลักฐาน', 'ผู้รับผิดชอบ', 'Due Date', 'การแก้ไขทันที', 'สาเหตุ', 'การแก้ไขถาวร', 'ผลตรวจประสิทธิผล', 'ผู้ยืนยัน', 'วันปิด', 'สถานะ', 'Overdue', 'จำนวนครั้งที่พบ', 'G/B/R'];
+  var ISSUE_W = [16, 18, 10, 14, 10, 10, 18, 8, 8, 8, 18, 8, 30, 40, 8, 16, 11, 30, 30, 30, 30, 14, 16, 14, 10, 8, 6];
+
+  PJO.exportAuditXlsx = function (id) {
+    PJO.toast('กำลังสร้างไฟล์ Excel…');
+    PJO.get('audit_export', { audit_id: id }).then(function (d) {
+      var a = d.audit, sn = d.snapshot, hd = a.header, n = sn.s1.frequency_count || 12, occs = [];
+      for (var i = 1; i <= n; i++) occs.push(i);
+      var sheets = [];
+      sheets.push({ name: 'ข้อมูล Audit', header: ['หัวข้อ', 'ค่า'], widths: [26, 60], rows: [['เลข Audit', a.audit_no], ['Revision', a.revision], ['สถานะ', d.status_th], ['วันที่', hd.audit_date], ['กะ', hd.shift],
+        ['Workshop', sn.name], ['Group', hd.group], ['Team', d.team], ['Line', hd.line], ['Station', hd.station], ['Model', hd.model], ['พนักงานที่ถูกตรวจ', hd.employee_name], ['ผู้ตรวจ', a.auditor_name || a.auditor],
+        ['TL/GL', hd.tlgl_name], ['แม่แบบมาตรฐาน', a.template_label], ['ไฟล์ต้นฉบับ', sn.source_file], ['OIS/WES Revision', hd.ois_revision], ['OIS เป็นฉบับปัจจุบัน', { yes: 'Yes', no: 'No' }[hd.ois_current] || 'ยังไม่ตอบ'],
+        ['Standard Time (s)', hd.standard_time_s], ['แหล่งที่มา Standard Time', hd.standard_time_source], ['Takt Time (s)', hd.takt_time_s], ['แหล่งที่มา Takt Time', hd.takt_time_source], ['ส่งออกเมื่อ', d.printed_at]] });
+      sheets.push({ name: 'ตาราง1 สังเกตงาน', header: ['ข้อ', 'ประเภท', 'รายการ'].concat(occs.map(function (o) { return 'ครั้งที่ ' + o; })), widths: [5, 7, 70].concat(occs.map(function () { return 7; })),
+        rows: sn.s1.items.map(function (it) { return [it.no, it.severity === 'major' ? 'หลัก' : 'รอง', it.text].concat(occs.map(function (o) { var m = a.marks[it.key + '|' + o]; return m ? SYM[m.v] : ''; })); }) });
+      var trows = [];
+      d.timing.forEach(function (t) { t.laps.forEach(function (l) {
+        trows.push([t.observation, l.lap_no, l.seconds, l.gross, l.paused, (l.pause_reasons || []).join('; '), l.source === 'manual' ? 'Manual' : 'Stopwatch', l.manual_reason, l.valid ? 'ใช้' : 'ไม่ใช้', l.invalid_reason,
+          t.discarded ? 'ถูกแทนที่' : '', t.saved_at ? PJO.fmtDT(t.saved_at) : '', (t.warnings || []).map(function (w) { return w.message; }).join('; ')]);
+      }); });
+      sheets.push({ name: 'การจับเวลา', header: ['ครั้งที่สังเกต', 'รอบจับเวลา', 'เวลาสุทธิ (s)', 'เวลารวม (s)', 'หยุดชั่วคราว (s)', 'เหตุผลหยุด', 'ที่มา', 'เหตุผล Manual', 'สถานะรอบ', 'เหตุผลไม่ใช้', 'หมายเหตุ', 'บันทึกเมื่อ', 'คำเตือน'],
+        widths: [10, 10, 12, 12, 12, 20, 11, 20, 9, 20, 12, 16, 30], rows: trows });
+      var s2 = [];
+      sn.s2.sections.forEach(function (sec) { sec.items.forEach(function (it) { var m = a.marks[it.key + '|0']; s2.push([sec.title, it.code, it.text, m ? SYM[m.v] : '']); }); });
+      sheets.push({ name: 'ตาราง2 โอกาสปรับปรุง', header: ['หมวด', 'รหัส', 'รายการ', 'ผล'], widths: [28, 8, 90, 6], rows: s2 });
+      sheets.push({ name: 'ตาราง3 ความเข้าใจ', header: ['ข้อ', 'คำถาม', 'ระดับความเข้าใจที่คาดหวัง', 'คำตอบพนักงาน', 'ก่อนสอน', 'สิ่งที่ชี้แนะ', 'หลังสอน'], widths: [5, 45, 45, 35, 8, 35, 8],
+        rows: sn.s3.questions.map(function (qq) { var x = a.s3[qq.key] || {}; return [qq.no, qq.text, qq.expected, x.employee_answer || '', SYM[x.before] || '', x.coaching || '', SYM[x.after] || '']; }) });
+      var cmap = {}; sn.s4.cases.forEach(function (c) { cmap[c.key] = c; });
+      sheets.push({ name: 'ตาราง4 ความผิดปกติ', header: ['แนวทาง', 'กรณี', 'คำตอบที่พึงประสงค์', 'ประเภท', 'คำตอบจริง', 'การชี้แนะ', 'ผล', 'ข้อเสนอแนะ', 'Issue'], widths: [22, 35, 40, 12, 35, 30, 6, 30, 16],
+        rows: a.s4.map(function (r) { var c = cmap[r.case_key] || {}; var iss = d.issues.filter(function (x) { return x.id === r.issue_id; })[0];
+          return [c.category || 'ประสบการณ์ของพนักงาน', c.case || r.case_text, c.answer || '', r.is_real_event ? 'เกิดจริง' : 'สถานการณ์สมมติ', r.employee_answer, r.coaching, SYM[r.result] || '', r.improvement, iss ? iss.issue_no : '']; }) });
+      sheets.push({ name: 'ลายเซ็น', header: ['บทบาท', 'ผู้ลงนาม', 'รหัส', 'วิธีระบุตัวตน', 'พยาน', 'วันเวลา', 'Revision', 'Hash ข้อมูลที่เซ็น', 'สถานะ'], widths: [30, 20, 10, 22, 14, 16, 8, 66, 30],
+        rows: d.all_signatures.map(function (s) { return [s.role_th, s.signer_name, s.signer_code, s.identity_method, s.witness, s.signed_at_th, s.revision, s.data_hash, s.superseded_at ? 'ถูกแทนที่: ' + s.superseded_reason : 'ใช้งาน']; }) });
+      sheets.push({ name: 'ปัญหา', header: ISSUE_HEAD, widths: ISSUE_W, rows: d.issues.map(function (x) {
+        return [x.issue_no, a.audit_no, a.workshop, d.team, x.station, hd.model, hd.employee_name, x.sheet, x.item_code, x.occurrences.map(function (o) { return o.occurrence; }).filter(Boolean).join(', '),
+          x.type_th, x.priority, x.title, x.description, x.n_attachments, x.owner_name, x.due_date, x.containment, x.root_cause, x.permanent_action, x.effectiveness, x.verifier,
+          x.closed_at ? PJO.fmtDT(x.closed_at) : '', x.status_th, x.overdue ? 'เกินกำหนด' : '', x.occurrences.length, x.gbr];
+      }) });
+      PJO.download(PJO.xlsx(sheets), a.audit_no + '_rev' + a.revision + '.xlsx');
+    });
+  };
+
+  PJO.exportIssues = function (filters) {
+    PJO.toast('กำลังสร้างไฟล์ Excel…');
+    PJO.get('issue_register', filters || {}).then(function (d) {
+      PJO.download(PJO.xlsx([{ name: 'ทะเบียนปัญหา PJO', header: ISSUE_HEAD, widths: ISSUE_W, rows: d.issues.map(function (x) {
+        return [x.issue_no, x.audit_no, x.workshop, x.team_name, x.station, x.model, x.employee_name, x.sheet, x.item_code, x.occurrence_list, x.type_th, x.priority, x.title, x.description,
+          x.n_attachments, x.owner_name || x.owner, x.due_date, x.containment, x.root_cause, x.permanent_action, x.effectiveness, x.verifier, x.closed_at ? PJO.fmtDT(x.closed_at) : '',
+          x.status_th, x.overdue ? 'เกินกำหนด' : '', Number(x.occurrences), x.gbr];
+      }) }]), 'PJO_issues_' + PJO.today().replace(/-/g, '') + '.xlsx');
+    });
+  };
+})();
+</script>
