@@ -1,0 +1,37 @@
+{% extends "pjo/base.html" %}{% load static %}
+{% block title %}{{ a.audit_no }} · CPS PJO Audit{% endblock %}
+{% block content %}
+<div class="formhead">
+  <div class="title">
+    <div><h1>{{ a.audit_no }} · PJO {{ a.workshop.name }}</h1>
+      <span class="muted">{{ snap.form_code }} · แม่แบบ {{ a.template.label }} · ต้นฉบับ {{ snap.source_file }}</span></div>
+    <div class="btnrow">
+      <button type="button" class="btn" id="btnOis">เปิด OIS/WES</button>
+      <a class="btn" href="{% url 'audit_print' a.pk %}" target="_blank" rel="noopener">พิมพ์</a>
+      <a class="btn" href="{% url 'audit_pdf' a.pk %}">PDF</a>
+      <a class="btn" href="{% url 'audit_xlsx' a.pk %}">Excel</a>
+    </div>
+  </div>
+  {% for p in pending_ws %}<div class="notice" style="margin:8px 14px"><b>รอยืนยัน:</b> {{ p.title }} <span class="muted">— {{ p.detail|truncatechars:160 }}</span></div>{% endfor %}
+  {% if pending_all %}<details style="margin:6px 14px"><summary class="muted" style="cursor:pointer;min-height:36px">ประเด็นรอยืนยันของมาตรฐาน (ทุก Workshop) {{ pending_all|length }} รายการ</summary>
+    {% for p in pending_all %}<div class="notice"><b>{{ p.title }}</b> <span class="muted">— {{ p.detail }}</span></div>{% endfor %}</details>{% endif %}
+  <details class="headtoggle" id="headToggle"><summary>ข้อมูลส่วนหัว</summary><div class="fields" id="headerFields"></div></details>
+</div>
+
+<div class="savebar">
+  <div class="btnrow"><span class="badge" id="statusBadge"></span><span id="flags"></span></div>
+  <div class="btnrow">
+    <span class="savestate" id="saveState" role="status" aria-live="polite"><span class="dot"></span><span class="txt">บันทึกแล้ว</span></span>
+    <button type="button" class="btn small" id="btnSubmit">ตรวจเสร็จ ส่งลงนาม</button>
+    <button type="button" class="btn small" id="btnSigs">ลงนาม</button>
+    <button type="button" class="btn small" id="btnAmend">ขอแก้ไขหลังลงนาม</button>
+    <button type="button" class="btn small danger" id="btnCancel">ยกเลิก Audit</button>
+  </div>
+</div>
+
+<div class="tabs" role="tablist" id="tabs"></div>
+<div class="sheet" id="sheet"></div>
+
+<script id="boot" type="application/json">{{ boot|safe }}</script>
+{% endblock %}
+{% block scripts %}<script src="{% static 'pjo/js/audit.js' %}"></script>{% endblock %}

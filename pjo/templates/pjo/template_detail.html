@@ -1,0 +1,57 @@
+{% extends "pjo/base.html" %}
+{% block title %}{{ t }} · CPS PJO Audit{% endblock %}
+{% block content %}
+<div class="pagehead">
+  <div><h1>{{ t.workshop.name }} v{{ t.version }} <span class="badge b-{{ t.status }}">{{ t.get_status_display }}</span></h1>
+    <span class="muted">{{ c.form_code }} · ต้นฉบับ {{ t.source_file }} · {{ t.change_note }}{% if t.published_at %} · Published {{ t.published_at|date:"d/m/Y H:i" }}{% endif %}</span></div>
+  <a class="btn" href="{% url 'templates' %}">← รายการแม่แบบ</a>
+</div>
+{% if is_admin %}<div class="card btnrow">
+  {% if t.status == 'draft' %}
+    <form method="post" class="btnrow">{% csrf_token %}<input type="hidden" name="action" value="publish"><input type="text" name="change_note" placeholder="สิ่งที่เปลี่ยนแปลง *" aria-label="สิ่งที่เปลี่ยนแปลง" style="width:320px"><button class="btn primary" onclick="return confirm('เผยแพร่ v{{ t.version }}? เวอร์ชัน Published เดิมจะเป็น Retired (Audit เดิมไม่เปลี่ยน)')">Publish</button></form>
+    <form method="post">{% csrf_token %}<input type="hidden" name="action" value="delete_draft"><button class="btn danger">ลบ Draft</button></form>
+  {% else %}
+    <form method="post">{% csrf_token %}<input type="hidden" name="action" value="new_draft"><button class="btn">สร้าง Draft ใหม่จากเวอร์ชันนี้</button></form>
+    {% if t.status == 'published' %}<form method="post">{% csrf_token %}<input type="hidden" name="action" value="retire"><button class="btn danger" onclick="return confirm('Retire เวอร์ชันนี้? จะเริ่ม Audit ใหม่ด้วย Workshop นี้ไม่ได้จนกว่าจะ Publish เวอร์ชันใหม่')">Retire</button></form>{% endif %}
+  {% endif %}
+</div>{% endif %}
+
+{% with edit=t.status|stringformat:"s" %}
+<h2>{{ c.s1.sheet_name }} · ระยะที่ 1 ส่วนที่ 1</h2>
+<div class="card"><div class="sheettitle">{{ c.s1.title }}</div>
+  <p class="src">{{ c.s1.ois_check.text }} ({{ c.s1.ois_check.source.cell }}) · ความถี่ {{ c.s1.frequency_count }} ช่อง</p>
+  <div class="resp"><div class="maj">{{ c.s1.major_response.text }}</div><div class="min">{{ c.s1.minor_response.text }}</div></div>
+  <table class="tbl"><tr><th>ข้อ</th><th>ประเภท</th><th>ข้อความ</th><th>N/A</th><th>แหล่งที่มา</th></tr>
+  {% for i in c.s1.items %}<tr><td>{{ i.no }}</td><td><span class="badge b-{{ i.severity }}">{% if i.severity == 'major' %}หลัก{% else %}รอง{% endif %}</span>{% if i.kind == 'timing' %} ⏱{% endif %}</td>
+    <td>{% if is_admin and t.status == 'draft' %}<form method="post">{% csrf_token %}<input type="hidden" name="action" value="edit_item"><input type="hidden" name="key" value="{{ i.key }}"><textarea name="text" aria-label="ข้อความข้อ {{ i.no }}">{{ i.text }}</textarea><label style="display:flex;gap:6px;align-items:center"><input type="checkbox" name="allow_na" {% if i.allow_na %}checked{% endif %}> อนุญาต N/A</label><button class="btn small">บันทึก</button></form>{% else %}{{ i.text }}{% endif %}</td>
+    <td>{% if i.allow_na %}✓{% else %}–{% endif %}</td><td class="src">{{ i.source.sheet }}!{{ i.source.cell }}</td></tr>{% endfor %}
+  </table>
+  <p class="src">ป้ายลายเซ็น: {% for l in c.s1.labels %}{{ l.text }} ({{ l.source.cell }}){% if not forloop.last %} · {% endif %}{% endfor %}</p>
+</div>
+
+<h2>{{ c.s2.sheet_name }} · ระยะที่ 1 ส่วนที่ 2</h2>
+<div class="card"><div class="sheettitle">{{ c.s2.title }}</div>
+  <table class="tbl">{% for s in c.s2.sections %}<tr class="sec"><td colspan="3">{{ s.title }} <span class="src">{{ s.source.cell }}</span></td></tr>
+  {% for i in s.items %}<tr><td>{{ i.code }}</td><td>{% if is_admin and t.status == 'draft' %}<form method="post">{% csrf_token %}<input type="hidden" name="action" value="edit_item"><input type="hidden" name="key" value="{{ i.key }}"><textarea name="text" aria-label="ข้อความ {{ i.code }}">{{ i.text }}</textarea><button class="btn small">บันทึก</button></form>{% else %}{{ i.text }}{% endif %}</td><td class="src">{{ i.source.cell }}</td></tr>{% endfor %}{% endfor %}</table>
+  <p class="src">คอลัมน์ตารางปัญหา: {% for x in c.s2.table_columns %}{{ x.text }}{% if not forloop.last %} / {% endif %}{% endfor %}</p>
+  <div class="box">{{ c.s2.note.text }}</div>
+</div>
+
+<h2>{{ c.s3.sheet_name }} · ระยะที่ 2</h2>
+<div class="card"><div class="sheettitle">{{ c.s3.title }}</div>
+  <table class="tbl"><tr><th>ข้อ</th><th>คำถาม</th><th>ระดับความเข้าใจที่คาดหวัง</th><th>แหล่งที่มา</th></tr>
+  {% for q in c.s3.questions %}<tr><td>{{ q.no }}{% if q.is_suggestion %}<br><small>ข้อเสนอแนะ</small>{% endif %}</td>
+    <td colspan="2">{% if is_admin and t.status == 'draft' %}<form method="post" class="grid" style="grid-template-columns:1fr 1fr">{% csrf_token %}<input type="hidden" name="action" value="edit_item"><input type="hidden" name="key" value="{{ q.key }}"><textarea name="text" aria-label="คำถาม {{ q.no }}">{{ q.text }}</textarea><textarea name="expected" aria-label="คำตอบที่คาดหวัง {{ q.no }}">{{ q.expected }}</textarea><button class="btn small">บันทึก</button></form>{% else %}<div class="grid" style="grid-template-columns:1fr 1fr"><div>{{ q.text }}</div><div class="pre">{{ q.expected }}</div></div>{% endif %}</td>
+    <td class="src">{{ q.source.cell }} / {{ q.expected_source.cell }}</td></tr>{% endfor %}</table>
+</div>
+
+<h2>{{ c.s4.sheet_name }} · ระยะที่ 3</h2>
+<div class="card"><div class="sheettitle">{{ c.s4.title }}</div>
+  <div class="steps4">{% for s in c.s4.steps %}<div><b>{{ s.no }}</b>{{ s.text }}</div>{% endfor %}</div>
+  <table class="tbl"><tr>{% for h in c.s4.columns %}<th>{{ h }}</th>{% endfor %}<th>แหล่งที่มา</th></tr>
+  {% for k in c.s4.cases %}<tr><td>{{ k.category }}</td><td colspan="2">{% if is_admin and t.status == 'draft' %}<form method="post" class="grid" style="grid-template-columns:1fr 1fr">{% csrf_token %}<input type="hidden" name="action" value="edit_item"><input type="hidden" name="key" value="{{ k.key }}"><textarea name="text" aria-label="กรณี {{ k.no }}">{{ k.case }}</textarea><textarea name="expected" aria-label="คำตอบที่พึงประสงค์ {{ k.no }}">{{ k.answer }}</textarea><button class="btn small">บันทึก</button></form>{% else %}<div class="grid" style="grid-template-columns:1fr 1fr"><div>{{ k.case }}</div><div>{{ k.answer }}</div></div>{% endif %}</td><td class="src">{{ k.source.cell }}</td></tr>{% endfor %}</table>
+  <p class="src">แผนภาพในแบบฟอร์ม: {% for b in c.s4.diagram_boxes %}{{ b.text }}{% if not forloop.last %} · {% endif %}{% endfor %}</p>
+</div>
+{% if c.ignored_sample_values %}<h2>ค่าตัวอย่างในไฟล์ที่ไม่ได้นำเข้า</h2><div class="card">{% for x in c.ignored_sample_values %}<div class="src">{{ x.source.sheet }}!{{ x.source.cell }} = “{{ x.value }}” · {{ x.reason }}</div>{% endfor %}</div>{% endif %}
+{% endwith %}
+{% endblock %}

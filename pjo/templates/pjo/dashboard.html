@@ -1,0 +1,50 @@
+{% extends "pjo/base.html" %}
+{% block title %}Dashboard · CPS PJO Audit{% endblock %}
+{% block content %}
+<div class="pagehead"><div><h1>Dashboard</h1><span class="muted">ข้อมูลจริงจากการตรวจในระบบ ไม่มีคะแนนรวม PJO (ยังไม่มีเกณฑ์อนุมัติ)</span></div>
+  <a class="btn primary" href="{% url 'start' %}">+ เริ่มตรวจ PJO</a></div>
+{% include "pjo/_wsfilter.html" %}
+
+<h2>แผนตรวจเดือนนี้</h2>
+<div class="tiles">
+  {% if plan_total %}
+  <a class="tile" href="{% url 'plans' %}"><div class="n">{{ plan_done }} / {{ plan_total }}</div><div class="l">ตรวจและลงนามครบ / แผน</div></a>
+  {% else %}
+  <div class="tile"><div class="n">–</div><div class="l">ยังไม่มีแผนตรวจเดือนนี้ จึงไม่คำนวณความสำเร็จตามแผน</div></div>
+  {% endif %}
+  <a class="tile" href="{% url 'plans' %}?status=in_progress"><div class="n">{{ in_progress }}</div><div class="l">กำลังตรวจ / ร่าง</div></a>
+  <a class="tile {% if pending_sig %}warn{% endif %}" href="{% url 'pending_signatures' %}"><div class="n">{{ pending_sig }}</div><div class="l">รอลงนาม</div></a>
+  <a class="tile" href="{% url 'plans' %}?status=completed"><div class="n">{{ completed }}</div><div class="l">ตรวจและลงนามครบ</div></a>
+  <div class="tile {% if completed_open %}warn{% endif %}"><div class="n">{{ completed_open }}</div><div class="l">ตรวจครบ แต่ยังมีปัญหาเปิด</div></div>
+</div>
+
+<h2>ความผิดปกติ (ตาราง 1)</h2>
+<div class="tiles">
+  <div class="tile alert"><div class="n">{{ major }}</div><div class="l"><span class="badge b-major">หลัก</span> จำนวนช่อง ×</div></div>
+  <div class="tile warn"><div class="n">{{ minor }}</div><div class="l"><span class="badge b-minor">รอง</span> จำนวนช่อง ×</div></div>
+  <a class="tile {% if fu_training %}alert{% endif %}" href="{% url 'pending_signatures' %}"><div class="n">{{ fu_training }}</div><div class="l">ความผิดปกติหลัก รอฝึกอบรม</div></a>
+  <a class="tile {% if fu_recert %}warn{% endif %}" href="{% url 'pending_signatures' %}"><div class="n">{{ fu_recert }}</div><div class="l">ฝึกอบรมแล้ว รอรับรองใหม่</div></a>
+</div>
+
+<h2>ปัญหา</h2>
+<div class="tiles">
+  <a class="tile" href="{% url 'issues' %}?status=open"><div class="n">{{ issues_open }}</div><div class="l">ยังไม่ปิด</div></a>
+  <a class="tile {% if issues_overdue %}alert{% endif %}" href="{% url 'issues' %}?overdue=1"><div class="n">{{ issues_overdue }}</div><div class="l">เกินกำหนด</div></a>
+  <a class="tile" href="{% url 'issues' %}?status=pending_verification"><div class="n">{{ issues_verify }}</div><div class="l">รอตรวจยืนยัน</div></a>
+  <a class="tile" href="{% url 'issues' %}?repeat=1"><div class="n">{{ issues_repeat }}</div><div class="l">ปัญหาซ้ำ (พบมากกว่า 1 ครั้ง)</div></a>
+</div>
+
+<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(320px,1fr))">
+<div class="card"><h3>ข้อที่พบ × บ่อย</h3>
+  {% if top_items %}<table class="tbl"><tr><th>Workshop</th><th>ข้อ</th><th class="right">ครั้ง</th></tr>
+  {% for k, n in top_items %}<tr><td>{{ k.0 }}</td><td>{{ k.2 }}…</td><td class="right">{{ n }}</td></tr>{% endfor %}</table>
+  {% else %}<p class="muted">ยังไม่มีข้อมูล</p>{% endif %}</div>
+<div class="card"><h3>ปัญหาเกินกำหนด</h3>
+  {% if overdue_list %}<table class="tbl">{% for i in overdue_list %}<tr><td><a href="{% url 'issue_detail' i.pk %}">{{ i.issue_no }}</a></td><td>{{ i.title }}</td><td class="nowrap">{{ i.due_date|date:"d/m/Y" }}</td></tr>{% endfor %}</table>
+  {% else %}<p class="muted">ไม่มี</p>{% endif %}</div>
+</div>
+<div class="card"><h3>Audit ล่าสุด</h3>
+  {% if recent %}<div class="tablewrap"><table class="tbl"><tr><th>เลข Audit</th><th>วันที่</th><th>Workshop</th><th>Station</th><th>พนักงาน</th><th>สถานะ</th></tr>
+  {% for a in recent %}<tr><td><a href="{% url 'audit_form' a.pk %}">{{ a.audit_no }}</a></td><td>{{ a.audit_date|date:"d/m/Y" }}</td><td>{{ a.workshop.code }}</td><td>{{ a.station }}</td><td>{{ a.employee_name }}</td><td><span class="badge b-{{ a.status }}">{{ a.status_th }}</span></td></tr>{% endfor %}
+  </table></div>{% else %}<p class="muted">ยังไม่มีการตรวจ</p>{% endif %}</div>
+{% endblock %}

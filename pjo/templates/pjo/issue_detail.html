@@ -1,0 +1,72 @@
+{% extends "pjo/base.html" %}
+{% block title %}{{ i.issue_no }} · CPS PJO Audit{% endblock %}
+{% block content %}
+<div class="pagehead">
+  <div><h1>{{ i.issue_no }} <span class="badge b-{{ i.status }}">{{ i.status_th }}</span>{% if i.is_overdue %} <span class="badge b-overdue">เกินกำหนด</span>{% endif %}{% if i.is_repeat %} <span class="badge b-pending">พบซ้ำ {{ occurrences|length }} ครั้ง</span>{% endif %}</h1>
+    <span class="muted">{{ i.get_issue_type_display }} · {{ i.workshop.name }}{% if i.team %} · {{ i.team }}{% endif %}{% if i.station %} · Station {{ i.station }}{% endif %}</span></div>
+  {% if i.audit %}<a class="btn" href="{% url 'audit_form' i.audit.pk %}">← กลับไปที่ {{ i.audit.audit_no }}</a>{% endif %}
+</div>
+
+<div class="card">
+  <div class="kv">
+    <div>Audit ID<b>{% if i.audit %}{{ i.audit.audit_no }}{% else %}–{% endif %}</b></div><div>ระยะ / ตาราง<b>{{ i.sheet|upper|default:"–" }}</b></div>
+    <div>รหัสข้อ<b>{{ i.item_code|default:"–" }}</b></div><div>Model<b>{{ i.model|default:"–" }}</b></div>
+    <div>พนักงาน<b>{% if i.employee %}{{ i.employee }}{% elif i.audit %}{{ i.audit.employee_name|default:"–" }}{% else %}–{% endif %}</b></div><div>ความสำคัญ<b>{{ i.priority|default:"–" }}</b></div>
+    <div>ผู้รับผิดชอบ<b>{{ i.owner_name|default:i.owner|default:"–" }}</b></div><div>Due Date<b>{{ i.due_date|date:"d/m/Y"|default:"–" }}</b></div>
+    <div>ผู้ยืนยัน<b>{{ i.verifier|default:"–" }}</b></div><div>วันปิด<b>{{ i.closed_at|date:"d/m/Y H:i"|default:"–" }}</b></div>
+  </div>
+</div>
+
+{% if followup %}<div class="notice err"><b>ความผิดปกติหลัก:</b> {{ followup.get_stage_display }} · ติดตามการฝึกอบรมและการรับรองใหม่ในแบบฟอร์ม <a href="{% url 'audit_form' followup.audit_id %}">{{ followup.audit.audit_no }}</a></div>{% endif %}
+
+<form method="post" enctype="multipart/form-data" class="card">{% csrf_token %}
+  <input type="hidden" name="action" value="save"><input type="hidden" name="lock_version" value="{{ i.lock_version }}">
+  <div class="grid">
+    <div class="wide"><label for="t">รายละเอียดปัญหา</label><textarea id="t" name="title" {% if not can_manage %}disabled{% endif %}>{{ i.title }}</textarea></div>
+    <div class="wide"><label for="d">หมายเหตุ</label><textarea id="d" name="description" {% if not can_manage %}disabled{% endif %}>{{ i.description }}</textarea></div>
+    <div><label for="pr">ความสำคัญ</label><select id="pr" name="priority" {% if not can_manage %}disabled{% endif %}>
+      <option value="" {% if not i.priority %}selected{% endif %}>- ไม่ระบุ -</option><option {% if i.priority == 'สูง' %}selected{% endif %}>สูง</option><option {% if i.priority == 'กลาง' %}selected{% endif %}>กลาง</option><option {% if i.priority == 'ต่ำ' %}selected{% endif %}>ต่ำ</option></select></div>
+    <div><label for="ow">ผู้รับผิดชอบ (ผู้ใช้)</label><select id="ow" name="owner" {% if not can_manage %}disabled{% endif %}><option value="">-</option>{% for u in users %}<option value="{{ u.pk }}" {% if i.owner_id == u.pk %}selected{% endif %}>{{ u.get_full_name|default:u.username }}</option>{% endfor %}</select></div>
+    <div><label for="on">ผู้รับผิดชอบ (ชื่อ/หน่วยงาน)</label><input id="on" type="text" name="owner_name" value="{{ i.owner_name }}" {% if not can_manage %}disabled{% endif %}></div>
+    <div><label for="due">Due Date</label><input id="due" type="date" name="due_date" value="{{ i.due_date|date:'Y-m-d' }}" {% if not can_manage %}disabled{% endif %}></div>
+    <div class="wide"><label for="c">การแก้ไขทันที</label><textarea id="c" name="containment" {% if not can_work %}disabled{% endif %}>{{ i.containment }}</textarea></div>
+    <div class="wide"><label for="rc">สาเหตุ</label><textarea id="rc" name="root_cause" {% if not can_work %}disabled{% endif %}>{{ i.root_cause }}</textarea></div>
+    <div class="wide"><label for="pa">การแก้ไขถาวร</label><textarea id="pa" name="permanent_action" {% if not can_work %}disabled{% endif %}>{{ i.permanent_action }}</textarea></div>
+    <div class="wide"><label for="ef">ผลตรวจประสิทธิผล (ผู้ตรวจยืนยัน)</label><textarea id="ef" name="effectiveness" {% if not can_verify %}disabled{% endif %}>{{ i.effectiveness }}</textarea></div>
+    <div><label>สถานะ G/B/R</label>
+      {% if gbr %}<select name="gbr"><option value="">-</option>{% for k, v in gbr.items %}<option value="{{ k }}" {% if i.gbr == k %}selected{% endif %}>{{ k }} = {{ v }}</option>{% endfor %}</select>
+      {% else %}<div class="box">รอผู้ดูแลยืนยันความหมาย G/B/R</div>{% endif %}</div>
+    <div class="wide"><label for="fs">แนบหลักฐานการแก้ไข (รูป/PDF)</label><input id="fs" type="file" name="files" multiple accept="image/*,application/pdf" {% if not can_work %}disabled{% endif %}></div>
+  </div>
+  {% if can_work or can_manage or can_verify %}<div class="btnrow" style="margin-top:10px"><button class="btn primary">บันทึก</button></div>{% endif %}
+</form>
+
+<div class="card"><h2 style="margin-top:0">Workflow</h2>
+  <form method="post" class="btnrow">{% csrf_token %}<input type="hidden" name="action" value="transition"><input type="hidden" name="lock_version" value="{{ i.lock_version }}">
+    <input type="text" name="comment" placeholder="ความเห็น / เหตุผล (จำเป็นเมื่อเปิดใหม่)" style="max-width:420px" aria-label="ความเห็น">
+    {% if i.status == 'open' or i.status == 'reopened' %}{% if can_manage %}<button class="btn" name="to" value="assigned">มอบหมาย</button>{% endif %}{% endif %}
+    {% if i.status == 'reopened' and can_work %}<button class="btn" name="to" value="in_progress">เริ่มแก้ไข</button>{% endif %}
+    {% if i.status == 'assigned' and can_work %}<button class="btn" name="to" value="in_progress">เริ่มแก้ไข</button>{% endif %}
+    {% if i.status == 'in_progress' and can_work %}<button class="btn primary" name="to" value="pending_verification">แจ้งแก้ไขเสร็จ (ส่งตรวจยืนยัน)</button>{% endif %}
+    {% if i.status == 'pending_verification' and can_verify %}<button class="btn primary" name="to" value="closed">ตรวจยืนยันและปิด</button><button class="btn" name="to" value="in_progress">ส่งกลับแก้ไข</button>{% endif %}
+    {% if i.status == 'closed' and can_manage or i.status == 'closed' and can_verify %}<button class="btn danger" name="to" value="reopened">เปิดใหม่</button>{% endif %}
+  </form>
+  {% if i.status == 'pending_verification' and not can_verify %}<p class="muted">รอผู้มีสิทธิ์ Verifier ตรวจยืนยันก่อนปิด</p>{% endif %}
+</div>
+
+<div class="card"><h2 style="margin-top:0">หลักฐาน</h2>
+  {% for a in attachments %}<div><a href="{% url 'attachment_file' a.pk %}" target="_blank" rel="noopener">{{ a.original_name }}</a> <small>{{ a.get_purpose_display|default:a.purpose }} · {{ a.uploaded_by }} · {{ a.uploaded_at|date:"d/m/Y H:i" }}</small></div>
+  {% empty %}<p class="muted">ไม่มีไฟล์แนบ</p>{% endfor %}
+</div>
+
+<div class="card"><h2 style="margin-top:0">ประวัติการพบ</h2>
+  <div class="tablewrap"><table class="tbl"><tr><th>วันเวลา</th><th>Audit</th><th>ตาราง</th><th>ข้อ / ครั้งที่</th><th>ผู้พบ</th><th>หมายเหตุ</th></tr>
+  {% for o in occurrences %}<tr><td class="nowrap">{{ o.found_at|date:"d/m/Y H:i" }}</td><td>{% if o.audit %}<a href="{% url 'audit_form' o.audit.pk %}">{{ o.audit.audit_no }}</a>{% endif %}</td><td>{{ o.sheet|upper }}</td><td>{{ o.item_key }}{% if o.occurrence %} · ครั้งที่ {{ o.occurrence }}{% endif %}</td><td>{{ o.found_by }}</td><td>{{ o.note }}{% if o.mark_changed_note %}<div class="notice">{{ o.mark_changed_note }}</div>{% endif %}</td></tr>{% endfor %}
+  </table></div>
+</div>
+<div class="card"><h2 style="margin-top:0">ประวัติการเปลี่ยนแปลง</h2>
+  <div class="tablewrap"><table class="tbl"><tr><th>วันเวลา</th><th>ผู้ใช้</th><th>การกระทำ</th><th>สถานะ</th><th>ความเห็น</th></tr>
+  {% for e in events %}<tr><td class="nowrap">{{ e.at|date:"d/m/Y H:i" }}</td><td>{{ e.user|default:"ระบบ" }}</td><td>{{ e.action }}</td><td>{{ e.from_status }}{% if e.to_status %} → {{ e.to_status }}{% endif %}</td><td>{{ e.comment }}</td></tr>{% endfor %}
+  </table></div>
+</div>
+{% endblock %}

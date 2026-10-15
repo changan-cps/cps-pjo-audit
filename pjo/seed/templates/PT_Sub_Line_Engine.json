@@ -1,0 +1,1242 @@
+{
+ "code": "PT_Sub_Line_Engine",
+ "name": "PT Sub Line Engine",
+ "form_code": "CATH-CPS009-B02",
+ "source_file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+ "s1": {
+  "sheet_name": "ตารางสังเกตการณ์ 1",
+  "title": "การสังเกตงานเป็นระยะ และการประเมินความเข้าใจเชิงลึก (PT Sub Line)\nระยะที่ 1 การสังเกตการทำงานเป็นระยะ (ส่วนที่ 1)",
+  "title_source": {
+   "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+   "sheet": "ตารางสังเกตการณ์ 1",
+   "cell": "A1"
+  },
+  "header_text": "ผู้ตรวจสอบ: กะ : หมายเลขกระบวนการ / สถานีงานที่สังเกต: ชื่อพนักงานที่ถูกสังเกต:",
+  "header_source": {
+   "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+   "sheet": "ตารางสังเกตการณ์ 1",
+   "cell": "A2"
+  },
+  "legend": {
+   "fail": "พนักงานไม่ปฏิบัติตามมาตรฐาน X",
+   "pass": "พนักงานปฏิบัติตามมาตรฐาน √",
+   "na": "N/A ไม่เกี่ยวข้อง",
+   "source": {
+    "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+    "sheet": "ตารางสังเกตการณ์ 1",
+    "cell": "A3"
+   }
+  },
+  "ois_check": {
+   "text": "สังเกตมาตรฐานล่วงหน้า ตรวจสอบให้แน่ใจOIS เป็นเอกสาร Version ปัจจุบัน อัพเดทล่าสุด",
+   "options": [
+    "Yes",
+    "No"
+   ],
+   "source": {
+    "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+    "sheet": "ตารางสังเกตการณ์ 1",
+    "cell": "A4"
+   }
+  },
+  "major_response": {
+   "text": "(1) เมื่อเกิดจุดผิดปกติสำคัญ ควรหยุดงานทันที และหัวหน้าทีม ควรรับหน้าที่จัดการฝึกอบรมออฟไลน์ให้กับพนักงาน",
+   "source": {
+    "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+    "sheet": "ตารางสังเกตการณ์ 1",
+    "cell": "A5"
+   }
+  },
+  "minor_response": {
+   "text": "(2) ไม่ต้องหยุดงาน ทำการสื่อสารกับสมาชิกในทีมและปรับเปลี่ยนมาตรฐานการปฏิบัติงานอย่างเหมาะสม ตรวจสอบให้แน่ใจว่าสมาชิกในทีมเข้าใจถึงความสำคัญของมาตรฐาน",
+   "source": {
+    "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+    "sheet": "ตารางสังเกตการณ์ 1",
+    "cell": "N5"
+   }
+  },
+  "frequency_label": "ความถี่",
+  "frequency_count": 12,
+  "items": [
+   {
+    "key": "S1-1",
+    "no": 1,
+    "text": "1. พนักงานสวมใส่อุปกรณ์ป้องกันส่วนบุคคล (PPE) อย่างถูกต้อง และเป็นไปตามข้อกำหนดในคู่มือการปฏิบัติงานและมาตรฐานการจัดการเชิงมองเห็นของสถานีงานหรือไม่",
+    "severity": "major",
+    "kind": "check",
+    "allow_na": true,
+    "source": {
+     "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+     "sheet": "ตารางสังเกตการณ์ 1",
+     "cell": "A7"
+    }
+   },
+   {
+    "key": "S1-2",
+    "no": 2,
+    "text": "2. มีการปฏิบัติตามข้อกำหนดด้านความปลอดภัยของกระบวนการ/สถานีงานหรือไม่ เช่น การแต่งกายที่เหมาะสม ทรงผมที่เหมาะสม การสวมใส่เครื่องประดับ และห้ามนำมือทั้งสองข้างเข้าไปในพื้นที่หมุนของเครื่องมือ รวมถึงเมื่อเข้าสู่พื้นที่อัตโนมัติต้องปฏิบัติตาม ECPL หรือไม่",
+    "severity": "major",
+    "kind": "check",
+    "allow_na": true,
+    "source": {
+     "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+     "sheet": "ตารางสังเกตการณ์ 1",
+     "cell": "A8"
+    }
+   },
+   {
+    "key": "S1-3",
+    "no": 3,
+    "text": "3. ลำดับขั้นตอนการทำงานเป็นไปตามที่กำหนดในคู่มือการ ปฏิบัติงานหรือไม่ และเป็นไปตามมาตรฐานด้านความปลอดภัยและ คุณภาพที่ระบุไว้หรือไม่",
+    "severity": "major",
+    "kind": "check",
+    "allow_na": true,
+    "source": {
+     "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+     "sheet": "ตารางสังเกตการณ์ 1",
+     "cell": "A9"
+    }
+   },
+   {
+    "key": "S1-4",
+    "no": 4,
+    "text": "4.มีการปฏิบัติตามจุดสำคัญของงานที่ระบุไว้ในคู่มือการปฏิบัติงาน และตารางองค์ประกอบงาน (OUS WES) หรือไม่",
+    "severity": "major",
+    "kind": "check",
+    "allow_na": true,
+    "source": {
+     "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+     "sheet": "ตารางสังเกตการณ์ 1",
+     "cell": "A10"
+    }
+   },
+   {
+    "key": "S1-5",
+    "no": 5,
+    "text": "5. มีการดำเนินมาตรการป้องกันการกระแทก รอยขีดข่วน รอยบุบ หรือจุดนูนหรือไม่ และมีการรักษามาตรฐาน 6S สำหรับชิ้นส่วนภายในและภายนอกหรือไม่ (เช่น การจัดเก็บชิ้นส่วน การสวมถุงมือและเสื้อผ้าที่สะอาด และการรักษาพื้นที่ทำงานให้สะอาดเป็นระเบียบ)",
+    "severity": "minor",
+    "kind": "check",
+    "allow_na": true,
+    "source": {
+     "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+     "sheet": "ตารางสังเกตการณ์ 1",
+     "cell": "N7"
+    }
+   },
+   {
+    "key": "S1-6",
+    "no": 6,
+    "text": "6.สมาชิกทีมมีสมาธิกับการปฏิบัติงานหรือไม่ (ไม่มีสิ่งรบกวน เช่น รับสายโทรศัพท์ ฟังเพลง เป็นต้น)",
+    "severity": "minor",
+    "kind": "check",
+    "allow_na": true,
+    "source": {
+     "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+     "sheet": "ตารางสังเกตการณ์ 1",
+     "cell": "N8"
+    }
+   },
+   {
+    "key": "S1-7",
+    "no": 7,
+    "text": "7. สมาชิกทีมดำเนินการทุกขั้นตอนของงานให้เสร็จสมบูรณ์ ก่อนพัก ก่อนรับประทานอาหารกลางวัน หรือก่อนเลิกงาน หรือไม่ (หัวหน้าทีมทบทวนและรายงานการปฏิบัติตามข้อ กำหนดนี้ของสมาชิกทีมที่ผ่านมา)",
+    "severity": "minor",
+    "kind": "check",
+    "allow_na": true,
+    "source": {
+     "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+     "sheet": "ตารางสังเกตการณ์ 1",
+     "cell": "N9"
+    }
+   },
+   {
+    "key": "S1-8",
+    "no": 8,
+    "text": "8. เมื่อเกิดความผิดปกติระหว่างกระบวนการ สมาชิกทีมสามารถตัดสินใจได้ทันทีว่าจะขอความช่วยเหลือจากใครหรือไม่ (มีขั้นตอนการรายงานหรือแผนการตอบสนองที่ ชัดเจน หรือไม่) และหัวหน้าทีมมีการบันทึกพฤติกรรมการ ปฏิบัติงานของสมาชิกทีมหรือไม่",
+    "severity": "minor",
+    "kind": "check",
+    "allow_na": true,
+    "source": {
+     "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+     "sheet": "ตารางสังเกตการณ์ 1",
+     "cell": "N10"
+    }
+   },
+   {
+    "key": "S1-9",
+    "no": 9,
+    "text": "9. ตรวจสอบว่าสมาชิกทีมไม่เริ่มงานเร็วเกินไปหรือทำงาน เสร็จช้าเกินไปภายในรอบการทำงาน (ซึ่งอาจทำให้ข้ามขั้นตอนด้านความปลอดภัยหรือการ ควบคุมคุณภาพ) และไม่เร่งรีบทำงานเพื่อให้เสร็จทันเวลา (ไม่มีปัญหาด้านการฝึกอบรมหรือการจัดสมดุลงาน)",
+    "severity": "minor",
+    "kind": "check",
+    "allow_na": true,
+    "source": {
+     "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+     "sheet": "ตารางสังเกตการณ์ 1",
+     "cell": "N11"
+    }
+   },
+   {
+    "key": "S1-10",
+    "no": 10,
+    "text": "10. วัดเวลาปฏิบัติงานของสมาชิกในทีม (ปริมาณงานจะหนักเกินไปหรืองานไม่สอด คล้องกับเวลาที่ใช้ในการผลิต)\nหมายเหตุ:\n1. กรอกเวลาการวัดในแบบฟอร์ม\n2.การวัดเวลาของผู้ปฏิบัติงานควรรวมเวลา ในการเดินด้วย",
+    "severity": "minor",
+    "kind": "timing",
+    "allow_na": true,
+    "source": {
+     "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+     "sheet": "ตารางสังเกตการณ์ 1",
+     "cell": "N12"
+    }
+   }
+  ],
+  "labels": [
+   {
+    "role": "employee_major",
+    "text": "ลายเซ็นพนักงานเพื่อยืนยันความผิดปกติหลัก",
+    "source": {
+     "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+     "sheet": "ตารางสังเกตการณ์ 1",
+     "cell": "A12"
+    }
+   },
+   {
+    "role": "employee_recert",
+    "text": "ลายเซ็นยืนยันความผิดปกติหลักหลังการรับรองใหม่",
+    "source": {
+     "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+     "sheet": "ตารางสังเกตการณ์ 1",
+     "cell": "A13"
+    }
+   },
+   {
+    "role": "problems",
+    "text": "ปัญหาที่พบจากการสังเกต:",
+    "source": {
+     "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+     "sheet": "ตารางสังเกตการณ์ 1",
+     "cell": "A14"
+    }
+   },
+   {
+    "role": "employee_minor",
+    "text": "ลายเซ็นพนักงานเพื่อยืนยันความผิดปกติรอง:",
+    "source": {
+     "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+     "sheet": "ตารางสังเกตการณ์ 1",
+     "cell": "N13"
+    }
+   },
+   {
+    "role": "employee_sign_label",
+    "text": "พนักงานลงชื่อ",
+    "source": {
+     "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+     "sheet": "ตารางสังเกตการณ์ 1",
+     "cell": "N14"
+    }
+   },
+   {
+    "role": "date_label",
+    "text": "วัน/เดือน/ปี",
+    "source": {
+     "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+     "sheet": "ตารางสังเกตการณ์ 1",
+     "cell": "N15"
+    }
+   }
+  ]
+ },
+ "s2": {
+  "sheet_name": "ตารางสังเกตการณ์ 2",
+  "title": "การสังเกตงานเป็นระยะ และการประเมินความเข้าใจเชิงลึก (PT Sub Line)\nระยะที่ 1 การสังเกตการทำงานเป็นระยะ (ส่วนที่ 2)",
+  "title_source": {
+   "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+   "sheet": "ตารางสังเกตการณ์ 2",
+   "cell": "B1"
+  },
+  "sections": [
+   {
+    "code": "A",
+    "title": "A-ความปลอดภัย-คุณภาพ",
+    "source": {
+     "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+     "sheet": "ตารางสังเกตการณ์ 2",
+     "cell": "B2"
+    },
+    "items": [
+     {
+      "no": 1,
+      "text": "1.สถานที่ทำงานจำเป็นต้องปรับปรุงเพื่อกำจัดความเสี่ยงด้านความปลอดภัยหรือไม่ เช่น สภาพแวดล้อม (แสงสว่าง เสียงดัง การสั่นสะเทือน คราบน้ำมัน) จำเป็นต้องปรับปรุงหรือไม่",
+      "source": {
+       "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+       "sheet": "ตารางสังเกตการณ์ 2",
+       "cell": "B3"
+      },
+      "code": "A-1",
+      "key": "S2-A-1"
+     },
+     {
+      "no": 2,
+      "text": "2.การก้มตัว การหมุนตัว หรือการเดิน สามารถลดหรือกำจัดออกได้หรือไม่",
+      "source": {
+       "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+       "sheet": "ตารางสังเกตการณ์ 2",
+       "cell": "B4"
+      },
+      "code": "A-2",
+      "key": "S2-A-2"
+     },
+     {
+      "no": 3,
+      "text": "3.มีการแสดงสัญลักษณ์เตือนความเสี่ยงด้านความปลอดภัยและคุณภาพในพื้นที่ปฏิบัติงานหรือไม่ เช่น การดำเนินการ ECPL การป้องกันการกระแทก การหนีบ การสะดุด การตก การชน หรืออันตรายจากสารเคมี รวมถึงการแสดงจุด NG (Blue Q / Red C) เครื่องมือการมองเห็นช่วยให้การควบคุมด้านความปลอดภัยและคุณภาพมีประสิทธิภาพหรือไม่",
+      "source": {
+       "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+       "sheet": "ตารางสังเกตการณ์ 2",
+       "cell": "K3"
+      },
+      "code": "A-3",
+      "key": "S2-A-3"
+     }
+    ]
+   },
+   {
+    "code": "B",
+    "title": "B-เครื่องมือ / อุปกรณ์ / สิ่งอำนวยความสะดวก",
+    "source": {
+     "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+     "sheet": "ตารางสังเกตการณ์ 2",
+     "cell": "B5"
+    },
+    "items": [
+     {
+      "no": 1,
+      "text": "1.ปัญหาด้านการยศาสตร์ (Ergonomics) สามารถแก้ไขได้โดยการเปลี่ยนเครื่องมือ จิ๊ก การจัด Layout หรืออุปกรณ์หรือไม่",
+      "source": {
+       "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+       "sheet": "ตารางสังเกตการณ์ 2",
+       "cell": "B6"
+      },
+      "code": "B-1",
+      "key": "S2-B-1"
+     },
+     {
+      "no": 2,
+      "text": "2.ตัวเครื่องมือ/อุปกรณ์/สิ่งอำนวยความสะดวกสามารถปรับปรุงให้ดีขึ้นได้หรือไม่ (ออกแบบตามความต้องการของงานหรือไม่ สามารถปรับปรุงได้หรือไม่ มีลูกบล็อกขนาดเดียวกันแต่แรงบิดต่างกันหรือไม่ หากมีสามารถแยกออกหรือระบุให้ชัดเจนได้หรือไม่ และเครื่องมือสามารถใช้งานได้โดยไม่ต้องพึ่งพาทักษะเฉพาะของผู้ปฏิบัติงาน ทุกคนสามารถใช้งานได้อย่างรวดเร็วและถูกต้องหรือไม่)",
+      "source": {
+       "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+       "sheet": "ตารางสังเกตการณ์ 2",
+       "cell": "B7"
+      },
+      "code": "B-2",
+      "key": "S2-B-2"
+     },
+     {
+      "no": 3,
+      "text": "3.การจัดการเครื่องมือ/อุปกรณ์/สิ่งอำนวยความสะดวกสามารถปรับปรุงได้หรือไม่ (ตำแหน่งการวาง ทิศทาง และลำดับอยู่ใกล้กับตำแหน่งการทำงานที่สุดหรือไม่ สอดคล้องกับลำดับงานหรือไม่ มีการกำหนดตำแหน่งและติดป้ายกำกับหรือไม่ มีการแขวนหรือยึดอย่างมั่นคงหรือไม่ และมีการตรวจสอบสภาพเครื่องมืออย่างถูกต้องหรือไม่)",
+      "source": {
+       "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+       "sheet": "ตารางสังเกตการณ์ 2",
+       "cell": "K6"
+      },
+      "code": "B-3",
+      "key": "S2-B-3"
+     }
+    ]
+   },
+   {
+    "code": "C",
+    "title": "C - กระบวนการปฏิบัติงาน",
+    "source": {
+     "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+     "sheet": "ตารางสังเกตการณ์ 2",
+     "cell": "B8"
+    },
+    "items": [
+     {
+      "no": 1,
+      "text": "1.มีวิธีที่ดีกว่าในการทำงานหรือไม่ (เช่น เพิ่มอุปกรณ์ช่วยง่าย ๆ เพื่อเพิ่มประสิทธิภาพ)",
+      "source": {
+       "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+       "sheet": "ตารางสังเกตการณ์ 2",
+       "cell": "B9"
+      },
+      "code": "C-1",
+      "key": "S2-C-1"
+     },
+     {
+      "no": 2,
+      "text": "2. ขั้นตอนการทำงานสามารถปรับปรุงได้หรือไม่ (มีลำดับงานที่ดีกว่าเพื่อลดการเดินที่สูญเปล่าหรือไม่ ขั้นตอนที่ไม่จำเป็นสามารถตัดออกได้หรือไม่ จำนวนขั้นตอนทั้งหมดสามารถลดลงได้หรือไม่)",
+      "source": {
+       "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+       "sheet": "ตารางสังเกตการณ์ 2",
+       "cell": "B10"
+      },
+      "code": "C-2",
+      "key": "S2-C-2"
+     },
+     {
+      "no": 3,
+      "text": "3. การปฏิบัติงานของผู้ปฏิบัติงานสามารถปรับปรุงได้หรือไม่ (ลดการรบกวนกันระหว่างผู้ปฏิบัติงานหรือไม่ มีความยากลำบากในการทำงานหรือไม่ เวลาในการรอหรือเดินสามารถลดได้หรือไม่ งานที่ไม่เป็นรอบสามารถลดได้หรือไม่ ปริมาณงานถึงอย่างน้อย 85% หรือไม่ และไม่มีการหยุดงานก่อนทำขั้นตอนทั้งหมดเสร็จ เพื่อป้องกันการลืมและการประกอบผิดแม้สายการผลิตหยุด)",
+      "source": {
+       "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+       "sheet": "ตารางสังเกตการณ์ 2",
+       "cell": "B11"
+      },
+      "code": "C-3",
+      "key": "S2-C-3"
+     },
+     {
+      "no": 4,
+      "text": "4.มีอุปกรณ์ป้องกันความผิดพลาด (Poka-Yoke) หรือไม่ และมีประสิทธิภาพหรือไม่",
+      "source": {
+       "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+       "sheet": "ตารางสังเกตการณ์ 2",
+       "cell": "K9"
+      },
+      "code": "C-4",
+      "key": "S2-C-4"
+     },
+     {
+      "no": 5,
+      "text": "5.ชิ้นส่วนขนาดเล็กที่ส่งมาจากสถานีงานอื่น (เช่น ป้าย แท่งอุด ปลั๊กไฟ สกรู ฯลฯ) ถูกติดตั้งในขั้นตอนแรกของสถานีงานหรือไม่ เพื่อลดโอกาสการประกอบผิดหรือหลงลืมจากการถูกรบกวน",
+      "source": {
+       "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+       "sheet": "ตารางสังเกตการณ์ 2",
+       "cell": "K10"
+      },
+      "code": "C-5",
+      "key": "S2-C-5"
+     }
+    ]
+   },
+   {
+    "code": "D",
+    "title": "D - วัสดุ",
+    "source": {
+     "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+     "sheet": "ตารางสังเกตการณ์ 2",
+     "cell": "B12"
+    },
+    "items": [
+     {
+      "no": 1,
+      "text": "1. หน้างานปฏิบัติตามมาตรฐานการจัดการวัสดุหรือไม่ (จำนวนชิ้นส่วนอยู่ในช่วง Min-Max หรือไม่ ชิ้นส่วนที่คล้ายกันถูกแยกเพื่อลดความสับสนหรือไม่ ภาชนะว่างและอุปกรณ์ช่วยมีวิธีจัดการหรือเคลื่อนย้ายที่เหมาะสมหรือไม่ ความสะอาดและคุณภาพพื้นผิวของวัสดุเป็นไปตามข้อกำหนดหรือไม่ และมีวิธีการควบคุมอย่างไร)",
+      "source": {
+       "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+       "sheet": "ตารางสังเกตการณ์ 2",
+       "cell": "B13"
+      },
+      "code": "D-1",
+      "key": "S2-D-1"
+     },
+     {
+      "no": 2,
+      "text": "2.หน้างานมีโอกาสในการปรับปรุงหรือไม่ (ตำแหน่งและทิศทางการวางชิ้นส่วนสะดวกต่อการทำงานหรือไม่ การจัดวางวัสดุเหมาะสมกับผู้ปฏิบัติงานหรือไม่ เช่น โต๊ะยก โต๊ะเอียง ชั้นวางหรืออุปกรณ์ขนย้าย ชิ้นส่วนที่ใช้บ่อยถูกวางใกล้จุดประกอบหรือไม่ และมีการใช้วิธีการจัดชุดหรือจัดลำดับชิ้นส่วนก่อนเข้าสายการผลิตอย่างเหมาะสมหรือไม่)",
+      "source": {
+       "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+       "sheet": "ตารางสังเกตการณ์ 2",
+       "cell": "K13"
+      },
+      "code": "D-2",
+      "key": "S2-D-2"
+     }
+    ]
+   }
+  ],
+  "log_title": {
+   "text": "บันทึกโอกาสการปรับปรุงที่เป็นไปได้:",
+   "source": {
+    "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+    "sheet": "ตารางสังเกตการณ์ 2",
+    "cell": "B14"
+   }
+  },
+  "table_columns": [
+   {
+    "text": "ลำดับ",
+    "source": {
+     "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+     "sheet": "ตารางสังเกตการณ์ 2",
+     "cell": "B15"
+    }
+   },
+   {
+    "text": "รหัสปัญหา",
+    "source": {
+     "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+     "sheet": "ตารางสังเกตการณ์ 2",
+     "cell": "C15"
+    }
+   },
+   {
+    "text": "คำอธิบายปัญหา",
+    "source": {
+     "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+     "sheet": "ตารางสังเกตการณ์ 2",
+     "cell": "D15"
+    }
+   },
+   {
+    "text": "ผู้รับผิดชอบ",
+    "source": {
+     "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+     "sheet": "ตารางสังเกตการณ์ 2",
+     "cell": "M15"
+    }
+   },
+   {
+    "text": "การแก้ไข",
+    "source": {
+     "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+     "sheet": "ตารางสังเกตการณ์ 2",
+     "cell": "N15"
+    }
+   },
+   {
+    "text": "สถานะปัญหา",
+    "source": {
+     "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+     "sheet": "ตารางสังเกตการณ์ 2",
+     "cell": "Q15"
+    }
+   }
+  ],
+  "paper_rows": 13,
+  "note": {
+   "text": "หมายเหตุ: ตารางข้างต้นนี้ได้รับการคิดและบันทึกโดยหัวหน้าเขตเอง หากไม่มีปัญหาและไม่สามารถปรับปรุงได้ ให้เขียน “√” มีสิ่งผิดปกติและสามารถปรับปรุงภาพวาดได้: \"×\" ตารางด้านล่างบันทึกปัญหาเฉพาะที่พิจารณาในตารางด้านบนและบันทึกเนื้อหา กรอกรหัสในตารางด้านบนใน \"คอลัมน์รหัส\", สถานะปัญหาให้กรอกสถานะ G,B,R\nตัวอย่าง: ในตารางด้านบน A-1: การก้มตัว การเหยียดแขน การเดิน และการก้มตัวที่มากเกินไปได้รับการลดลงหรือถูกกำจัดหรือไม่ หากพบปัญหา ให้กรอก A-1 ในคอลัมน์รหัสในตารางด้านล่าง กรอกหน่วยที่สามารถแก้ไขปัญหาได้ในคอลัมน์ \"หน่วยการปรับปรุง\" หากพบปัญหาในกระบวนการก่อนหน้านี้ ให้กรอกทีมก่อนหน้านี้",
+   "source": {
+    "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+    "sheet": "ตารางสังเกตการณ์ 2",
+    "cell": "B29"
+   }
+  }
+ },
+ "s3": {
+  "sheet_name": "ตารางสังเกตการณ์ 3",
+  "title": "การสังเกตงานเป็นระยะ และการประเมินความเข้าใจเชิงลึก (PT Sub Line)\nระยะที่ 2 ความเข้าใจเชิงลึกของกระบวนการ (การเรียนรู้อย่างต่อเนื่อง)",
+  "title_source": {
+   "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+   "sheet": "ตารางสังเกตการณ์ 3",
+   "cell": "A1"
+  },
+  "goal": {
+   "text": "เป้าหมาย: หัวหน้าพื้นที่ (Group Leader) และสมาชิกทีมทำงานร่วมกันอย่างกระตือรือร้น\nขั้นตอน: พาสมาชิกทีมออกจากสายการผลิต และหัวหน้าพื้นที่ทำการแนะนำและสอนสมาชิกทีม เพื่อให้เกิดความเข้าใจเชิงลึกเกี่ยวกับการปฏิบัติงาน\nหัวหน้าพื้นที่และสมาชิกทีมหารือเกี่ยวกับความผิดปกติที่พบในระยะที่ 1 ให้คำแนะนำ ยืนยันผล และให้สมาชิกทีมลงนามรับทราบ\nหัวหน้าพื้นที่และสมาชิกทีมหารือเกี่ยวกับโอกาสในการปรับปรุงที่พบในระยะที่ 1\nหัวหน้าพื้นที่ตั้งคำถามและชี้นำสมาชิกทีมตามคำถามในระยะที่ 2 จนกว่าจะได้คำตอบที่เหมาะสม\nสอบถามสมาชิกทีมเพื่อระบุโอกาสในการปรับปรุงอย่างต่อเนื่อง และบันทึกไว้\nหมายเหตุ: ในขั้นตอนนี้ต้องนำคู่มือการปฏิบัติงานของสถานีงานนั้นมาด้วย",
+   "source": {
+    "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+    "sheet": "ตารางสังเกตการณ์ 3",
+    "cell": "A2"
+   }
+  },
+  "step": {
+   "text": "ขั้นตอน: ตั้งคำถามกับสมาชิกทีมและยืนยันความเข้าใจในความรู้เกี่ยวกับการปฏิบัติ งานของพนักงาน",
+   "source": {
+    "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+    "sheet": "ตารางสังเกตการณ์ 3",
+    "cell": "A3"
+   }
+  },
+  "guidance": {
+   "text": "หัวหน้าพื้นที่ Group Leader) ต้องให้คำชมเชยหรือเสริมคำตอบของสมาชิกทีม เพื่อให้ได้คำตอบที่ถูกต้องตามที่ต้องการ (พร้อมชี้แนะคำตอบที่ถูกต้อง)",
+   "source": {
+    "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+    "sheet": "ตารางสังเกตการณ์ 3",
+    "cell": "F3"
+   }
+  },
+  "col_question": "คำถามสำหรับสมาชิกทีม",
+  "col_expected": "ระดับความเข้าใจที่คาดหวัง",
+  "questions": [
+   {
+    "key": "S3-1",
+    "no": 1,
+    "text": "คุณเข้าใจลำดับขั้นตอนการทำงานของคุณหรือไม่ ให้สมาชิกทีมอธิบายลำดับการทำงาน และอธิบายว่าขั้นตอน ชิ้นส่วน หรือขนาดใดที่มีผลต่อคุณภาพและความปลอดภัย",
+    "expected": "สมาชิกทีมต้องสามารถอธิบายลำดับงาน และเข้าใจมาตรฐานที่เกี่ยวข้อง เช่น การเลือกชิ้นส่วน การแยกขั้นตอนที่ซับซ้อน การทำงานให้เสร็จในสถานีงานพร้อมตรวจสอบคุณภาพ และการรักษาความปลอดภัยในพื้นที่ทำงาน (ความเสี่ยงลื่น/สะดุด การควบคุมอันตราย และ 6S)",
+    "is_suggestion": false,
+    "source": {
+     "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+     "sheet": "ตารางสังเกตการณ์ 3",
+     "cell": "C6"
+    },
+    "expected_source": {
+     "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+     "sheet": "ตารางสังเกตการณ์ 3",
+     "cell": "F6"
+    }
+   },
+   {
+    "key": "S3-2",
+    "no": 2,
+    "text": "หากไม่ปฏิบัติตามลำดับขั้นตอนที่ระบุใน OIS WES จะเกิดอะไรขึ้น",
+    "expected": "สมาชิกทีมเข้าใจความเสี่ยงด้านคุณภาพ ผลผลิต และความปลอดภัยที่อาจเกิดขึ้น",
+    "is_suggestion": false,
+    "source": {
+     "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+     "sheet": "ตารางสังเกตการณ์ 3",
+     "cell": "C7"
+    },
+    "expected_source": {
+     "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+     "sheet": "ตารางสังเกตการณ์ 3",
+     "cell": "F7"
+    }
+   },
+   {
+    "key": "S3-3",
+    "no": 3,
+    "text": "ชิ้นส่วนที่คุณติดตั้งในสถานีงานมีหน้าที่อะไร",
+    "expected": "สมาชิกทีมเข้าใจหน้าที่ของชิ้นส่วน และผลกระทบต่อผลิตภัณฑ์หากติดตั้งไม่ถูกต้อง",
+    "is_suggestion": false,
+    "source": {
+     "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+     "sheet": "ตารางสังเกตการณ์ 3",
+     "cell": "C8"
+    },
+    "expected_source": {
+     "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+     "sheet": "ตารางสังเกตการณ์ 3",
+     "cell": "F8"
+    }
+   },
+   {
+    "key": "S3-4",
+    "no": 4,
+    "text": "เมื่อมีการเปลี่ยนแปลง 4M การทดลองผลิตสินค้าใหม่ หรือมีชิ้นส่วนหลายประเภท คุณรู้ได้อย่างไรว่าต้องใช้ชิ้นส่วนใด",
+    "expected": "สมาชิกทีมเข้าใจกระบวนการจัดการ 4M และสามารถใช้เครื่องมือ Visual Management และ Production Instruction เพื่อระบุข้อมูลได้ถูกต้อง",
+    "is_suggestion": false,
+    "source": {
+     "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+     "sheet": "ตารางสังเกตการณ์ 3",
+     "cell": "C9"
+    },
+    "expected_source": {
+     "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+     "sheet": "ตารางสังเกตการณ์ 3",
+     "cell": "F9"
+    }
+   },
+   {
+    "key": "S3-5",
+    "no": 5,
+    "text": "ลูกค้าของคุณคือใคร และงานของคุณส่งผลต่อทั้งลูกค้าภายในและภายนอกอย่างไร",
+    "expected": "สมาชิกทีมรู้ว่าลูกค้าคือใคร และเข้าใจผลกระทบหากงานไม่เป็นไปตามมาตรฐาน",
+    "is_suggestion": false,
+    "source": {
+     "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+     "sheet": "ตารางสังเกตการณ์ 3",
+     "cell": "C10"
+    },
+    "expected_source": {
+     "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+     "sheet": "ตารางสังเกตการณ์ 3",
+     "cell": "F10"
+    }
+   },
+   {
+    "key": "S3-6",
+    "no": 6,
+    "text": "คุณรู้ได้อย่างไรว่างานที่ทำถูกต้อง เช่น มี Poka-Yoke หรือไม่ ตรวจสอบอย่างไร และระบบป้องกันข้อผิดพลาดมีความเสี่ยงหรือไม่",
+    "expected": "สมาชิกทีมเข้าใจว่าผลิตภัณฑ์ต้องผ่านมาตรฐานคุณภาพก่อนออกจากสถานีงาน และรู้วิธีใช้ระบบป้องกันข้อผิดพลาดอย่างถูกต้อง",
+    "is_suggestion": false,
+    "source": {
+     "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+     "sheet": "ตารางสังเกตการณ์ 3",
+     "cell": "C11"
+    },
+    "expected_source": {
+     "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+     "sheet": "ตารางสังเกตการณ์ 3",
+     "cell": "F11"
+    }
+   },
+   {
+    "key": "S3-7",
+    "no": 7,
+    "text": "ในกระบวนการประกอบ (Sub-Line) มีเครื่องมือหรืออุปกรณ์ช่วยหรือไม่ และคุณทราบข้อกำหนดการสอบเทียบหรือไม่",
+    "expected": "ผู้ปฏิบัติงานสามารถอธิบายเครื่องมือที่ใช้ หน้าที่ของเครื่องมือ รวมถึงการสอบเทียบและมาตรการความปลอดภัยที่ต้องปฏิบัติ",
+    "is_suggestion": false,
+    "source": {
+     "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+     "sheet": "ตารางสังเกตการณ์ 3",
+     "cell": "C12"
+    },
+    "expected_source": {
+     "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+     "sheet": "ตารางสังเกตการณ์ 3",
+     "cell": "F12"
+    }
+   },
+   {
+    "key": "S3-8",
+    "no": 8,
+    "text": "สำหรับสถานีงานที่มีอุปกรณ์แขวน มีการตรวจสอบก่อนใช้งานอะไรบ้าง ตรวจสอบอะไร หากมีเสียงผิดปกติจะทำอย่างไร และหากพบปัญหาในการตรวจสอบต้องจัดการอย่างไร",
+    "expected": "สมาชิกทีมเข้าใจและปฏิบัติตามขั้นตอนความปลอดภัยของอุปกรณ์แขวน",
+    "is_suggestion": false,
+    "source": {
+     "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+     "sheet": "ตารางสังเกตการณ์ 3",
+     "cell": "C13"
+    },
+    "expected_source": {
+     "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+     "sheet": "ตารางสังเกตการณ์ 3",
+     "cell": "F13"
+    }
+   },
+   {
+    "key": "S3-9",
+    "no": 9,
+    "text": "คุณมีข้อเสนอแนะในการปรับปรุงกระบวนการทำงานของคุณหรือไม่?",
+    "expected": "ให้บันทึกข้อเสนอแนะในช่องด้านล่าง",
+    "is_suggestion": true,
+    "source": {
+     "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+     "sheet": "ตารางสังเกตการณ์ 3",
+     "cell": "C14"
+    },
+    "expected_source": {
+     "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+     "sheet": "ตารางสังเกตการณ์ 3",
+     "cell": "F14"
+    }
+   }
+  ],
+  "suggestion_title": {
+   "text": "ปัญหาที่สมาชิกทีมเสนอให้แก้ไข หรือข้อเสนอแนะเพื่อการปรับปรุงอย่างต่อเนื่อง:",
+   "source": {
+    "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+    "sheet": "ตารางสังเกตการณ์ 3",
+    "cell": "A15"
+   }
+  },
+  "suggestion_columns": [
+   {
+    "text": "ลำดับ",
+    "source": {
+     "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+     "sheet": "ตารางสังเกตการณ์ 3",
+     "cell": "A16"
+    }
+   },
+   {
+    "text": "คำอธิบายปัญหา",
+    "source": {
+     "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+     "sheet": "ตารางสังเกตการณ์ 3",
+     "cell": "C16"
+    }
+   },
+   {
+    "text": "ข้อเสนอแนะการปรับปรุง",
+    "source": {
+     "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+     "sheet": "ตารางสังเกตการณ์ 3",
+     "cell": "I16"
+    }
+   },
+   {
+    "text": "ผู้รับผิดชอบ",
+    "source": {
+     "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+     "sheet": "ตารางสังเกตการณ์ 3",
+     "cell": "O16"
+    }
+   }
+  ],
+  "paper_rows": 5,
+  "signature": {
+   "text": "ลายเซ็นของผู้บังคับบัญชา (Group Leader, MFG. Engineer, Process Eng.): ลายเซ็นของพนักงาน:",
+   "source": {
+    "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+    "sheet": "ตารางสังเกตการณ์ 3",
+    "cell": "A22"
+   }
+  }
+ },
+ "s4": {
+  "sheet_name": "ตารางสังเกตการณ์ 4",
+  "title": "การสังเกตงานเป็นระยะ และการประเมินความเข้าใจเชิงลึก (PT Sub Line)\nระยะที่ 3 การจัดการกรณีความผิดปกติ (เพื่อป้องกันของเสียและอุบัติเหตุ)",
+  "title_source": {
+   "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+   "sheet": "ตารางสังเกตการณ์ 4",
+   "cell": "A1"
+  },
+  "goal": {
+   "text": "เป้าหมาย: ระบุสถานการณ์ผิดปกติและความผิดปกติที่อาจเกิดขึ้น (ปัญหาที่ซ่อนอยู่ในโรงงานอาจไม่ถูกค้นพบในการทำ PJO ครั้งนี้) และจัดทำแผนการตอบสนองก่อนที่ความผิดปกติจะกลายเป็นอุบัติเหตุ เมื่อเกิดความผิดปกติ สมาชิกทีมต้องสามารถตัดสินใจอย่างสอดคล้องกันตามจุดสำคัญของกระบวนการ",
+   "source": {
+    "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+    "sheet": "ตารางสังเกตการณ์ 4",
+    "cell": "A2"
+   }
+  },
+  "lead": {
+   "text": "ขั้นตอนของระยะที่ 3 ดำเนินการโดยมีหัวหน้าพื้นที่ (Group Leader) เป็นผู้นำ",
+   "source": {
+    "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+    "sheet": "ตารางสังเกตการณ์ 4",
+    "cell": "A4"
+   }
+  },
+  "steps": [
+   {
+    "no": 1,
+    "text": "ใช้คู่มือการปฏิบัติงาน (Work Instruction) ร่วมกับสมาชิกทีมในการทบทวนแต่ละขั้นตอนของการทำงาน ซึ่งรวมถึงจุดสำคัญด้านคุณภาพ และความเสี่ยงด้านความปลอดภัย พร้อมสอบ ถามสมาชิกทีมว่าพวกเขาเคยพบประสบการณ์ ความผิดปกติใด ๆ มาก่อนหรือไม่ (เช่น วัสดุ กระบวนการถัดไป เครื่องมือ หรืออุปกรณ์ เป็นต้น) และใช้กรณีตัวอย่างของความผิดปกติเพื่อกระตุ้น การสนทนาและการคิดวิเคราะห์",
+    "source": {
+     "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+     "sheet": "ตารางสังเกตการณ์ 4",
+     "cell": "A5"
+    }
+   },
+   {
+    "no": 2,
+    "text": "สอบถามสมาชิกทีมว่าเมื่อเกิดความผิดปกติ มีการแก้ไขปัญหาอย่างไร และมีการปรับเปลี่ยนหรือปรับปรุงมาตรฐานของกระบวนการตามความผิดปกตินั้นหรือไม่?",
+    "source": {
+     "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+     "sheet": "ตารางสังเกตการณ์ 4",
+     "cell": "G5"
+    }
+   },
+   {
+    "no": 3,
+    "text": "ความผิดปกติจะถูกบันทึกลงในแบบฟอร์มติดตามปัญหาของทีมโดยตรง เพื่อดำเนินการติดตาม ผล การยกระดับปัญหา และการจัดการปัญหาที่เกี่ยว ข้อง",
+    "source": {
+     "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+     "sheet": "ตารางสังเกตการณ์ 4",
+     "cell": "K5"
+    }
+   },
+   {
+    "no": 4,
+    "text": "ตรวจประเมินความรับผิดชอบพื้นฐานของสมาชิกทีมในการปฏิบัติงานด้านคุณภาพ และประเมินผลการปฏิบัติงานด้านความปลอดภัยของพนักงานตาม 4 ระยะ",
+    "source": {
+     "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+     "sheet": "ตารางสังเกตการณ์ 4",
+     "cell": "N5"
+    }
+   }
+  ],
+  "discussion_title": {
+   "text": "ตัวอย่างคำถามการอภิปราย",
+   "source": {
+    "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+    "sheet": "ตารางสังเกตการณ์ 4",
+    "cell": "A16"
+   }
+  },
+  "columns": [
+   "แนวทางการคิดวิเคราะห์\nเกี่ยวกับความผิดปกติ",
+   "ตัวอย่างกรณีความผิดปกติ",
+   "คำตอบที่พึงประสงค์"
+  ],
+  "cases": [
+   {
+    "key": "S4-1",
+    "no": 1,
+    "category": "เมื่อเกิดความผิดปกติ",
+    "category_source": {
+     "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+     "sheet": "ตารางสังเกตการณ์ 4",
+     "cell": "A18"
+    },
+    "case": "วัสดุหรือชิ้นส่วนขาด",
+    "answer": "แจ้งหัวหน้าทีมทันที เพื่อจัดหาวัสดุและป้องกันไม่ให้กระทบกระบวนการถัดไป",
+    "source": {
+     "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+     "sheet": "ตารางสังเกตการณ์ 4",
+     "cell": "E18"
+    },
+    "answer_source": {
+     "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+     "sheet": "ตารางสังเกตการณ์ 4",
+     "cell": "K18"
+    }
+   },
+   {
+    "key": "S4-2",
+    "no": 2,
+    "category": "เมื่อเกิดความผิดปกติ",
+    "category_source": {
+     "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+     "sheet": "ตารางสังเกตการณ์ 4",
+     "cell": "A18"
+    },
+    "case": "สภาพของวัสดุแตกต่างจากปกติ",
+    "answer": "หยุดใช้งานวัสดุชิ้นนั้น และแจ้งหัวหน้าทีมหรือช่างเทคนิคกระบวนการเพื่อตรวจสอบก่อนใช้งาน",
+    "source": {
+     "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+     "sheet": "ตารางสังเกตการณ์ 4",
+     "cell": "E19"
+    },
+    "answer_source": {
+     "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+     "sheet": "ตารางสังเกตการณ์ 4",
+     "cell": "K19"
+    }
+   },
+   {
+    "key": "S4-3",
+    "no": 3,
+    "category": "เมื่อเกิดความผิดปกติ",
+    "category_source": {
+     "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+     "sheet": "ตารางสังเกตการณ์ 4",
+     "cell": "A18"
+    },
+    "case": "วัสดุที่มีข้อบกพร่อง",
+    "answer": "แยกชิ้นส่วนที่มีปัญหา และแจ้งหัวหน้าทีม พร้อมให้ VRT หรือผู้รับผิดชอบยืนยัน",
+    "source": {
+     "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+     "sheet": "ตารางสังเกตการณ์ 4",
+     "cell": "E20"
+    },
+    "answer_source": {
+     "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+     "sheet": "ตารางสังเกตการณ์ 4",
+     "cell": "K20"
+    }
+   },
+   {
+    "key": "S4-4",
+    "no": 4,
+    "category": "เมื่อเกิดความผิดปกติ",
+    "category_source": {
+     "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+     "sheet": "ตารางสังเกตการณ์ 4",
+     "cell": "A18"
+    },
+    "case": "ปัญหาในการประกอบหรือการใช้งานวัสดุ",
+    "answer": "แจ้งหัวหน้าทีมทันที หากไม่สามารถแก้ไขได้ให้ติดต่อช่างเทคนิคกระบวนการ",
+    "source": {
+     "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+     "sheet": "ตารางสังเกตการณ์ 4",
+     "cell": "E21"
+    },
+    "answer_source": {
+     "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+     "sheet": "ตารางสังเกตการณ์ 4",
+     "cell": "K21"
+    }
+   },
+   {
+    "key": "S4-5",
+    "no": 5,
+    "category": "เมื่อเกิดความผิดปกติ",
+    "category_source": {
+     "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+     "sheet": "ตารางสังเกตการณ์ 4",
+     "cell": "A18"
+    },
+    "case": "ทำงานอย่างเร่งรีบเพื่อให้เสร็จ",
+    "answer": "หยุดและตรวจสอบสาเหตุ เช่น ปัญหาจากกระบวนการก่อนหน้า หรือสมดุลสายการผลิต แล้วแจ้งหัวหน้าทีมหรือช่างเทคนิค",
+    "source": {
+     "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+     "sheet": "ตารางสังเกตการณ์ 4",
+     "cell": "E22"
+    },
+    "answer_source": {
+     "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+     "sheet": "ตารางสังเกตการณ์ 4",
+     "cell": "K22"
+    }
+   },
+   {
+    "key": "S4-6",
+    "no": 6,
+    "category": "เมื่อพบข้อบกพร่องที่ทราบอยู่แล้ว",
+    "category_source": {
+     "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+     "sheet": "ตารางสังเกตการณ์ 4",
+     "cell": "A23"
+    },
+    "case": "ข้อบกพร่องเดิมไม่เกิดซ้ำแต่เกิดข้อบกพร่องใหม่",
+    "answer": "ปฏิบัติตามมาตรการที่กำหนด และแจ้งหัวหน้าทีมเพื่อวิเคราะห์ปัญหาใหม่",
+    "source": {
+     "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+     "sheet": "ตารางสังเกตการณ์ 4",
+     "cell": "E23"
+    },
+    "answer_source": {
+     "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+     "sheet": "ตารางสังเกตการณ์ 4",
+     "cell": "K23"
+    }
+   },
+   {
+    "key": "S4-7",
+    "no": 7,
+    "category": "เมื่อพบข้อบกพร่องเดียวกัน 2 ครั้งขึ้นไป",
+    "category_source": {
+     "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+     "sheet": "ตารางสังเกตการณ์ 4",
+     "cell": "A24"
+    },
+    "case": "ข้อบกพร่องที่เคยแก้ไขแล้วกลับมาเกิดใหม่ในเวลาอันสั้น",
+    "answer": "หยุดการประกอบ แจ้งหัวหน้าทีม และตรวจสอบกระบวนการอีกครั้ง",
+    "source": {
+     "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+     "sheet": "ตารางสังเกตการณ์ 4",
+     "cell": "E24"
+    },
+    "answer_source": {
+     "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+     "sheet": "ตารางสังเกตการณ์ 4",
+     "cell": "K24"
+    }
+   },
+   {
+    "key": "S4-8",
+    "no": 8,
+    "category": "เมื่อการประเมินผลิตภัณฑ์หรือชิ้นส่วนไม่ชัดเจน",
+    "category_source": {
+     "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+     "sheet": "ตารางสังเกตการณ์ 4",
+     "cell": "A25"
+    },
+    "case": "งานเสร็จแล้วแต่ไม่แน่ใจว่าชิ้นส่วนผ่านมาตรฐานหรือไม่",
+    "answer": "ห้ามตัดสินใจเอง แจ้งหัวหน้าทีมหรือช่างเทคนิคเพื่อตรวจสอบและยืนยัน",
+    "source": {
+     "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+     "sheet": "ตารางสังเกตการณ์ 4",
+     "cell": "E25"
+    },
+    "answer_source": {
+     "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+     "sheet": "ตารางสังเกตการณ์ 4",
+     "cell": "K25"
+    }
+   },
+   {
+    "key": "S4-9",
+    "no": 9,
+    "category": "เมื่อการประเมินผลิตภัณฑ์หรือชิ้นส่วนไม่ชัดเจน",
+    "category_source": {
+     "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+     "sheet": "ตารางสังเกตการณ์ 4",
+     "cell": "A25"
+    },
+    "case": "ผลิตภัณฑ์หรือชิ้นส่วนดูแตกต่างจากปกติ",
+    "answer": "หยุดใช้งานชิ้นส่วนนั้น และแจ้งหัวหน้าทีมเพื่อตรวจสอบก่อนดำเนินการต่อ",
+    "source": {
+     "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+     "sheet": "ตารางสังเกตการณ์ 4",
+     "cell": "E26"
+    },
+    "answer_source": {
+     "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+     "sheet": "ตารางสังเกตการณ์ 4",
+     "cell": "K26"
+    }
+   },
+   {
+    "key": "S4-10",
+    "no": 10,
+    "category": "เมื่อพบความผิดปกติของเครื่องมือหรืออุปกรณ์",
+    "category_source": {
+     "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+     "sheet": "ตารางสังเกตการณ์ 4",
+     "cell": "A27"
+    },
+    "case": "เครื่องมือขัดข้อง",
+    "answer": "หยุดใช้เครื่องมือ แจ้งหัวหน้าทีม และเปลี่ยนเป็นเครื่องมือสำรองหรือซ่อมก่อนใช้งาน",
+    "source": {
+     "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+     "sheet": "ตารางสังเกตการณ์ 4",
+     "cell": "E27"
+    },
+    "answer_source": {
+     "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+     "sheet": "ตารางสังเกตการณ์ 4",
+     "cell": "K27"
+    }
+   },
+   {
+    "key": "S4-11",
+    "no": 11,
+    "category": "เมื่อพบความผิดปกติของเครื่องมือหรืออุปกรณ์",
+    "category_source": {
+     "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+     "sheet": "ตารางสังเกตการณ์ 4",
+     "cell": "A27"
+    },
+    "case": "มีการเปลี่ยนเครื่องมือจากเดิม",
+    "answer": "แจ้งหัวหน้าทีมเพื่อตรวจสอบว่าเครื่องมือใหม่ถูกต้องตามมาตรฐานกระบวนการ",
+    "source": {
+     "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+     "sheet": "ตารางสังเกตการณ์ 4",
+     "cell": "E28"
+    },
+    "answer_source": {
+     "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+     "sheet": "ตารางสังเกตการณ์ 4",
+     "cell": "K28"
+    }
+   },
+   {
+    "key": "S4-12",
+    "no": 12,
+    "category": "เมื่อพบความผิดปกติของเครื่องมือหรืออุปกรณ์",
+    "category_source": {
+     "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+     "sheet": "ตารางสังเกตการณ์ 4",
+     "cell": "A27"
+    },
+    "case": "เครื่องมือแสดงว่าได้แรงบิดแล้วแต่น็อตยังไม่แน่น",
+    "answer": "ตรวจสอบและขันใหม่ หากยังมีปัญหาให้แจ้งหัวหน้าทีมหรือช่างเทคนิค",
+    "source": {
+     "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+     "sheet": "ตารางสังเกตการณ์ 4",
+     "cell": "E29"
+    },
+    "answer_source": {
+     "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+     "sheet": "ตารางสังเกตการณ์ 4",
+     "cell": "K29"
+    }
+   },
+   {
+    "key": "S4-13",
+    "no": 13,
+    "category": "เมื่อพบความผิดปกติของเครื่องมือหรืออุปกรณ์",
+    "category_source": {
+     "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+     "sheet": "ตารางสังเกตการณ์ 4",
+     "cell": "A27"
+    },
+    "case": "อุปกรณ์ป้องกันความผิดพลาด (Poka-Yoke) ขัดข้อง",
+    "answer": "หยุดการทำงาน แจ้งหัวหน้าทีม และติดต่อทีมซ่อมเพื่อแก้ไข",
+    "source": {
+     "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+     "sheet": "ตารางสังเกตการณ์ 4",
+     "cell": "E30"
+    },
+    "answer_source": {
+     "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+     "sheet": "ตารางสังเกตการณ์ 4",
+     "cell": "K30"
+    }
+   },
+   {
+    "key": "S4-14",
+    "no": 14,
+    "category": "เมื่อพบความผิดปกติของเครื่องมือหรืออุปกรณ์",
+    "category_source": {
+     "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+     "sheet": "ตารางสังเกตการณ์ 4",
+     "cell": "A27"
+    },
+    "case": "อุปกรณ์มีเสียงผิดปกติ",
+    "answer": "หยุดใช้งานทันที แจ้งหัวหน้าทีม และให้ทีมซ่อมตรวจสอบ",
+    "source": {
+     "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+     "sheet": "ตารางสังเกตการณ์ 4",
+     "cell": "E31"
+    },
+    "answer_source": {
+     "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+     "sheet": "ตารางสังเกตการณ์ 4",
+     "cell": "K31"
+    }
+   },
+   {
+    "key": "S4-15",
+    "no": 15,
+    "category": "เมื่อข้อบกพร่องหายไปแต่ไม่มีคำอธิบาย",
+    "category_source": {
+     "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+     "sheet": "ตารางสังเกตการณ์ 4",
+     "cell": "A32"
+    },
+    "case": "ได้รับคำสั่งควบคุมข้อบกพร่องแต่ไม่มีใครอธิบายเหตุผล",
+    "answer": "ปฏิบัติตามคำสั่ง และสอบถามหัวหน้าทีมเพื่อให้เข้าใจสาเหตุและวิธีป้องกัน",
+    "source": {
+     "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+     "sheet": "ตารางสังเกตการณ์ 4",
+     "cell": "E32"
+    },
+    "answer_source": {
+     "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+     "sheet": "ตารางสังเกตการณ์ 4",
+     "cell": "K32"
+    }
+   }
+  ],
+  "record_title": {
+   "text": "บันทึกที่แนะนำ",
+   "source": {
+    "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+    "sheet": "ตารางสังเกตการณ์ 4",
+    "cell": "L33"
+   }
+  },
+  "record_columns": [
+   "คำอธิบายปัญหา",
+   "ข้อเสนอแนะการปรับปรุง"
+  ],
+  "diagram_boxes": [
+   {
+    "text": "เข้าใจจุดเริ่มต้นและจุดสิ้นสุดของกระบวนการทำงาน และไม่ทำงานอย่างเร่งรีบ",
+    "source": {
+     "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+     "sheet": "ตารางสังเกตการณ์ 4",
+     "cell": "shape@R34C4"
+    }
+   },
+   {
+    "text": "ดำเนินการทุกขั้นตอนของงานให้เสร็จภายในกระบวนการ/สถานีงาน",
+    "source": {
+     "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+     "sheet": "ตารางสังเกตการณ์ 4",
+     "cell": "shape@R34C6"
+    }
+   },
+   {
+    "text": "ปฏิบัติงานตามขั้นตอนที่ OIS/WES ระบุ",
+    "source": {
+     "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+     "sheet": "ตารางสังเกตการณ์ 4",
+     "cell": "shape@R35C1"
+    }
+   },
+   {
+    "text": "รายงานความผิดปกติใด ๆ ที่พบทันที",
+    "source": {
+     "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+     "sheet": "ตารางสังเกตการณ์ 4",
+     "cell": "shape@R35C7"
+    }
+   },
+   {
+    "text": "สิ่งที่กระตุ้นให้เกิดการตอบสนอง:\n• งานที่รับผิดชอบ\n• ความรับผิดชอบส่วน บุคคล\n• ความรับผิดชอบต่องาน\n• ความรับผิดชอบต่อทีมงาน",
+    "source": {
+     "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+     "sheet": "ตารางสังเกตการณ์ 4",
+     "cell": "shape@R40C2"
+    }
+   },
+   {
+    "text": "วินัยในตนเอง: เลือกปฏิบัติในสิ่งที่ถูกต้องตามมาตรฐาน แม้จะมีทางลัดอื่นที่สามารถทำได้",
+    "source": {
+     "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+     "sheet": "ตารางสังเกตการณ์ 4",
+     "cell": "shape@R40C5"
+    }
+   },
+   {
+    "text": "ตระหนักและเข้าใจสิ่งรอบตัวในการทำงาน",
+    "source": {
+     "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+     "sheet": "ตารางสังเกตการณ์ 4",
+     "cell": "shape@R41C1"
+    }
+   },
+   {
+    "text": "รายงานความผิดปกติที่พบ",
+    "source": {
+     "file": "CATH-CPS009-B02_PJO_EvaluationTemplate_-_PT_Sub_Line_Engine.xlsx",
+     "sheet": "ตารางสังเกตการณ์ 4",
+     "cell": "shape@R41C7"
+    }
+   }
+  ]
+ },
+ "ignored_sample_values": []
+}

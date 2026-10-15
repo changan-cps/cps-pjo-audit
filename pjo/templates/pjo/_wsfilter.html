@@ -1,0 +1,7 @@
+<form method="get" class="filters">
+  <div><label for="wsf">Workshop</label>
+    <select id="wsf" name="workshop" onchange="this.form.submit()">
+      <option value="">ทุก Workshop ที่มีสิทธิ์</option>
+      {% for w in workshops %}<option value="{{ w.code }}" {% if sel and sel.id == w.id %}selected{% endif %}>{{ w.name }}</option>{% endfor %}
+    </select></div>
+</form>

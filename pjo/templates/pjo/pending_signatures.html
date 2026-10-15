@@ -1,0 +1,17 @@
+{% extends "pjo/base.html" %}
+{% block title %}รายการรอลงนาม · CPS PJO Audit{% endblock %}
+{% block content %}
+<div class="pagehead"><h1>รายการรอลงนาม</h1></div>
+<div class="card"><h2 style="margin-top:0">Audit ที่ยังลงนามไม่ครบ</h2>
+  {% if rows %}<div class="tablewrap"><table class="tbl list"><tr><th>เลข Audit</th><th>Workshop</th><th>Station</th><th>พนักงาน</th><th>Rev</th><th>รอลงนาม</th><th></th></tr>
+  {% for a, missing in rows %}<tr><td>{{ a.audit_no }}</td><td>{{ a.workshop.code }}</td><td>{{ a.station }}</td><td>{{ a.employee_name }}</td><td>{{ a.revision }}</td>
+    <td>{% for m in missing %}<span class="badge b-pending">{{ m.label|truncatechars:48 }}</span> {% endfor %}</td>
+    <td><a class="btn small primary" href="{% url 'audit_form' a.pk %}">เปิดเพื่อลงนาม</a></td></tr>{% endfor %}
+  </table></div>{% else %}<p class="muted">ไม่มีรายการรอลงนาม</p>{% endif %}
+</div>
+<div class="card"><h2 style="margin-top:0">ความผิดปกติหลัก: รอฝึกอบรม / รอรับรองใหม่</h2>
+  {% if recert %}<div class="tablewrap"><table class="tbl list"><tr><th>Audit</th><th>Issue</th><th>ข้อ · ครั้งที่</th><th>ขั้นตอน</th></tr>
+  {% for f in recert %}<tr><td><a href="{% url 'audit_form' f.audit.pk %}">{{ f.audit.audit_no }}</a></td><td><a href="{% url 'issue_detail' f.issue.pk %}">{{ f.issue.issue_no }}</a></td><td>{{ f.item_key }} · {{ f.occurrence }}</td><td><span class="badge b-major">{{ f.get_stage_display }}</span></td></tr>{% endfor %}
+  </table></div>{% else %}<p class="muted">ไม่มีรายการ</p>{% endif %}
+</div>
+{% endblock %}

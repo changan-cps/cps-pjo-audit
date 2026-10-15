@@ -1,0 +1,34 @@
+{% extends "pjo/base.html" %}
+{% block title %}จัดการแม่แบบและมาตรฐาน · CPS PJO Audit{% endblock %}
+{% block content %}
+<div class="pagehead"><div><h1>จัดการแม่แบบและมาตรฐาน</h1><span class="muted">Draft → Published → Retired · Audit เก็บสำเนามาตรฐานของตัวเอง แก้แม่แบบใหม่ไม่กระทบ Audit เก่า</span></div></div>
+<div class="tablewrap card" style="padding:0"><table class="tbl list">
+  <tr><th>Workshop</th><th>เวอร์ชัน</th><th>ตาราง 1</th><th>ตาราง 2</th><th>ตาราง 3</th><th>ตาราง 4</th><th>ไฟล์ต้นฉบับ</th><th>ใช้ใน Audit</th></tr>
+  {% for w, ts in data %}{% for t in ts %}<tr>
+    <td>{% if forloop.first %}<b>{{ w.name }}</b>{% endif %}</td>
+    <td><a href="{% url 'template_detail' t.pk %}">v{{ t.version }}</a> <span class="badge b-{{ t.status }}">{{ t.get_status_display }}</span></td>
+    <td>{{ t.content.s1.items|length }} ข้อ</td><td>{% with s=t.content.s2.sections %}{% for x in s %}{{ x.code }}{{ x.items|length }} {% endfor %}{% endwith %}</td>
+    <td>{{ t.content.s3.questions|length }} ข้อ</td><td>{{ t.content.s4.cases|length }} กรณี</td>
+    <td><small>{{ t.source_file }}</small></td><td>{{ t.audits.count }}</td></tr>{% endfor %}{% endfor %}
+</table></div>
+
+<h2>รายการรอยืนยัน (ระบบไม่เดาเอง)</h2>
+{% for p in pending %}<div class="card">
+  <div class="btnrow" style="justify-content:space-between"><b>{{ p.code }} · {{ p.title }}</b><span class="badge {% if p.status == 'pending' %}b-pending{% else %}b-closed{% endif %}">{{ p.get_status_display }}</span></div>
+  <p class="pre">{{ p.detail }}</p>
+  <div class="src">Workshop: {{ p.workshops }} · แหล่งอ้างอิง: {% for s in p.sources %}{{ s.file }} / {{ s.sheet }} / {{ s.cell }}{% if not forloop.last %}; {% endif %}{% endfor %}</div>
+  {% if p.status == 'resolved' %}<div class="notice info">ผลการยืนยัน: {{ p.resolution }} · {{ p.resolved_by }} {{ p.resolved_at|date:"d/m/Y H:i" }}</div>
+  {% elif is_admin %}<form method="post" action="{% url 'pending_resolve' p.pk %}" class="btnrow" style="margin-top:8px">{% csrf_token %}<input type="text" name="resolution" placeholder="บันทึกผลการยืนยันจากผู้ดูแลมาตรฐาน" aria-label="ผลการยืนยัน" style="max-width:520px"><button class="btn small">บันทึกการยืนยัน</button></form>{% endif %}
+</div>{% endfor %}
+
+<h2>ความหมายสถานะ G / B / R</h2>
+<div class="card">
+  {% if gbr %}<p>G = {{ gbr.G }} · B = {{ gbr.B }} · R = {{ gbr.R }}</p>{% else %}<p class="notice">ยังไม่กำหนด ระบบจะไม่ใช้ G/B/R จนกว่าจะยืนยัน</p>{% endif %}
+  {% if is_admin %}<form method="post" action="{% url 'gbr_setting' %}" class="grid">{% csrf_token %}
+    <div><label>G หมายถึง</label><input type="text" name="G" value="{{ gbr.G|default:'' }}"></div>
+    <div><label>B หมายถึง</label><input type="text" name="B" value="{{ gbr.B|default:'' }}"></div>
+    <div><label>R หมายถึง</label><input type="text" name="R" value="{{ gbr.R|default:'' }}"></div>
+    <div style="align-self:end"><button class="btn">บันทึกความหมาย G/B/R</button></div></form>
+    <p class="muted">บันทึกเฉพาะเมื่อผู้ดูแลมาตรฐานยืนยันความหมายแล้ว</p>{% endif %}
+</div>
+{% endblock %}

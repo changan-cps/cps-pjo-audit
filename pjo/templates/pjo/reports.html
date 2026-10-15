@@ -1,0 +1,14 @@
+{% extends "pjo/base.html" %}
+{% block title %}รายงานและ Export · CPS PJO Audit{% endblock %}
+{% block content %}
+<div class="pagehead"><h1>รายงานและ Export</h1><a class="btn" href="{% url 'issues_xlsx' %}?workshop={{ code }}">ทะเบียนปัญหา (Excel)</a></div>
+<form method="get" class="filters card" style="padding:12px">
+  <div><label>Workshop</label><select name="workshop"><option value="">ทั้งหมด</option>{% for w in workshops %}<option value="{{ w.code }}" {% if code == w.code %}selected{% endif %}>{{ w.name }}</option>{% endfor %}</select></div>
+  <div><label>ตั้งแต่</label><input type="date" name="from" value="{{ d1 }}"></div><div><label>ถึง</label><input type="date" name="to" value="{{ d2 }}"></div>
+  <div><button class="btn primary">กรอง</button></div>
+</form>
+<div class="tablewrap"><table class="tbl list"><tr><th>เลข Audit</th><th>วันที่</th><th>Workshop</th><th>Station</th><th>พนักงาน</th><th>Rev</th><th>สถานะ</th><th>Export</th></tr>
+{% for a in audits %}<tr><td><a href="{% url 'audit_form' a.pk %}">{{ a.audit_no }}</a></td><td>{{ a.audit_date|date:"d/m/Y" }}</td><td>{{ a.workshop.code }}</td><td>{{ a.station }}</td><td>{{ a.employee_name }}</td><td>{{ a.revision }}</td><td><span class="badge b-{{ a.status }}">{{ a.status_th }}</span></td>
+  <td class="nowrap"><a class="btn small" href="{% url 'audit_pdf' a.pk %}">PDF</a> <a class="btn small" href="{% url 'audit_xlsx' a.pk %}">Excel</a> <a class="btn small" href="{% url 'audit_print' a.pk %}" target="_blank" rel="noopener">พิมพ์</a></td></tr>
+{% empty %}<tr><td colspan="8" class="muted">ไม่มีข้อมูล</td></tr>{% endfor %}</table></div>
+{% endblock %}

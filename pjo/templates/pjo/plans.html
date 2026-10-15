@@ -1,0 +1,39 @@
+{% extends "pjo/base.html" %}
+{% block title %}แผนและรายการตรวจ · CPS PJO Audit{% endblock %}
+{% block content %}
+<div class="pagehead"><h1>แผนและรายการตรวจ PJO</h1><a class="btn primary" href="{% url 'start' %}">+ เริ่มตรวจ PJO</a></div>
+{% include "pjo/_wsfilter.html" %}
+<div class="card">
+  <h2 style="margin-top:0">แผนตรวจ</h2>
+  {% if plans %}<div class="tablewrap"><table class="tbl list"><tr><th>วันที่แผน</th><th>Workshop</th><th>Team</th><th>Station</th><th>พนักงาน</th><th>ผู้ตรวจ</th><th>ผล</th><th></th></tr>
+  {% for p in plans %}<tr><td>{{ p.planned_date|date:"d/m/Y" }}</td><td>{{ p.workshop.code }}</td><td>{{ p.team|default:"" }}</td><td>{{ p.station }}</td><td>{{ p.employee|default:"" }}</td><td>{{ p.auditor|default:"" }}</td>
+    <td>{% for a in p.audits.all %}<a href="{% url 'audit_form' a.pk %}">{{ a.audit_no }}</a> <span class="badge b-{{ a.status }}">{{ a.status_th }}</span><br>{% empty %}<span class="muted">ยังไม่ตรวจ</span>{% endfor %}</td>
+    <td class="nowrap"><a class="btn small" href="{% url 'start' %}?plan={{ p.pk }}">เริ่มตรวจ</a>
+      <form method="post" style="display:inline">{% csrf_token %}<input type="hidden" name="action" value="cancel"><input type="hidden" name="plan" value="{{ p.pk }}"><input type="hidden" name="workshop" value="{{ p.workshop_id }}"><button class="btn small danger" onclick="return confirm('ยกเลิกแผนนี้?')">ยกเลิก</button></form></td></tr>{% endfor %}
+  </table></div>{% else %}<p class="muted">ยังไม่มีแผนตรวจ</p>{% endif %}
+  <details style="margin-top:12px"><summary class="btn">+ เพิ่มแผนตรวจ</summary>
+  <form method="post" class="grid" style="margin-top:12px">{% csrf_token %}
+    <div><label>Workshop</label><select name="workshop" required>{% for w in workshops %}<option value="{{ w.pk }}" {% if sel and sel.id == w.id %}selected{% endif %}>{{ w.name }}</option>{% endfor %}</select></div>
+    <div><label>วันที่แผน</label><input type="date" name="planned_date" required></div>
+    <div><label>Team</label><select name="team"><option value="">-</option>{% for t in teams %}<option value="{{ t.pk }}">{{ t }}</option>{% endfor %}</select></div>
+    <div><label>Station</label><input type="text" name="station"></div>
+    <div><label>พนักงาน</label><select name="employee"><option value="">-</option>{% for e in employees %}<option value="{{ e.pk }}">{{ e }}</option>{% endfor %}</select></div>
+    <div><label>ผู้ตรวจ</label><select name="auditor"><option value="">-</option>{% for u in users %}<option value="{{ u.pk }}">{{ u.get_full_name|default:u.username }}</option>{% endfor %}</select></div>
+    <div class="wide"><label>หมายเหตุ</label><input type="text" name="note"></div>
+    <div style="align-self:end"><button class="btn primary">บันทึกแผน</button></div>
+  </form></details>
+</div>
+
+<div class="card">
+  <h2 style="margin-top:0">รายการตรวจ</h2>
+  <form method="get" class="filters">
+    {% if sel %}<input type="hidden" name="workshop" value="{{ sel.code }}">{% endif %}
+    <div><label>สถานะ</label><select name="status"><option value="">ทั้งหมด</option>{% for v, l in statuses %}<option value="{{ v }}" {% if status == v %}selected{% endif %}>{{ l }}</option>{% endfor %}</select></div>
+    <div><label>ค้นหา</label><input type="search" name="q" value="{{ q }}" placeholder="เลข Audit / Station / พนักงาน"></div>
+    <div><button class="btn">กรอง</button></div>
+  </form>
+  <div class="tablewrap"><table class="tbl list"><tr><th>เลข Audit</th><th>วันที่</th><th>Workshop</th><th>Station</th><th>พนักงาน</th><th>ผู้ตรวจ</th><th>Rev</th><th>สถานะ</th></tr>
+  {% for a in audits %}<tr><td><a href="{% url 'audit_form' a.pk %}">{{ a.audit_no }}</a></td><td>{{ a.audit_date|date:"d/m/Y" }}</td><td>{{ a.workshop.code }}</td><td>{{ a.station }}</td><td>{{ a.employee_name }}</td><td>{{ a.auditor }}</td><td>{{ a.revision }}</td><td><span class="badge b-{{ a.status }}">{{ a.status_th }}</span></td></tr>
+  {% empty %}<tr><td colspan="8" class="muted">ไม่มีรายการ</td></tr>{% endfor %}</table></div>
+</div>
+{% endblock %}

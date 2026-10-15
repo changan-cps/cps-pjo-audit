@@ -1,0 +1,116 @@
+{% load static %}<!doctype html>
+<html lang="th"><head><meta charset="utf-8"><title>{{ a.audit_no }} Rev {{ a.revision }} · PJO {{ a.workshop.name }}</title>
+<style>
+@font-face { font-family: "Sarabun"; src: url("{% if embed %}{{ font_dir }}/Sarabun-Regular.ttf{% else %}{% static 'pjo/fonts/Sarabun-Regular.ttf' %}{% endif %}"); font-weight: 400; }
+@font-face { font-family: "Sarabun"; src: url("{% if embed %}{{ font_dir }}/Sarabun-Bold.ttf{% else %}{% static 'pjo/fonts/Sarabun-Bold.ttf' %}{% endif %}"); font-weight: 700; }
+@page { size: A4 landscape; margin: 8mm; }
+* { box-sizing: border-box; }
+body { font-family: "Sarabun", Tahoma, sans-serif; font-size: 9.5pt; line-height: 1.35; color: #000; margin: 0; }
+.page { page-break-after: always; }
+.page:last-child { page-break-after: auto; }
+h1 { font-size: 12pt; text-align: center; margin: 0 0 4px; white-space: pre-line; }
+h2 { font-size: 10.5pt; margin: 8px 0 4px; }
+table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+th, td { border: 0.6pt solid #333; padding: 2.5px 4px; vertical-align: top; word-wrap: break-word; overflow-wrap: anywhere; }
+th { background: #dde5f0; font-weight: 700; }
+thead { display: table-header-group; }
+tr { page-break-inside: avoid; }
+.c { text-align: center; }
+.sec td { background: #eef2f7; font-weight: 700; }
+.hdr td { border: 0.6pt solid #333; }
+.hdr b { font-weight: 700; }
+.small { font-size: 8pt; color: #333; }
+.sig { height: 46px; text-align: center; }
+.sig img { max-height: 42px; max-width: 100%; }
+.pass { color: #0a6b34; font-weight: 700; } .fail { color: #b42318; font-weight: 700; }
+.toolbar { padding: 8px; background: #f4f6f9; border-bottom: 1px solid #ccc; }
+@media print { .toolbar { display: none; } }
+.maj { border-left: 3pt solid #b42318; } .min { border-left: 3pt solid #9a6400; }
+.pre { white-space: pre-line; }
+</style></head>
+<body>
+{% if not embed %}<div class="toolbar"><button onclick="window.print()">พิมพ์ / บันทึกเป็น PDF</button> <span class="small">ตั้งค่ากระดาษ A4 แนวนอน</span></div>{% endif %}
+
+{% with s1=snap.s1 %}
+<div class="page">
+  <h1>{{ s1.title }}</h1>
+  <table class="hdr" style="margin-bottom:4px">
+    <tr><td><b>เลข Audit:</b> {{ a.audit_no }} Rev {{ a.revision }}</td><td><b>วันที่:</b> {{ a.audit_date|date:"d/m/Y" }}</td><td><b>กะ:</b> {{ a.shift }}</td><td><b>Workshop:</b> {{ a.workshop.name }}</td><td><b>Group/Team:</b> {{ a.group }} {{ a.team.name|default:"" }}</td><td><b>Line:</b> {{ a.line }}</td></tr>
+    <tr><td><b>Station:</b> {{ a.station }}</td><td><b>Model:</b> {{ a.model }}</td><td colspan="2"><b>พนักงานที่ถูกสังเกต:</b> {{ a.employee_name }}</td><td><b>ผู้ตรวจสอบ:</b> {{ a.auditor.get_full_name|default:a.auditor.username }}</td><td><b>TL/GL:</b> {{ a.tlgl_name }}</td></tr>
+    <tr><td colspan="2"><b>แม่แบบ:</b> {{ a.template.label }}</td><td colspan="2"><b>OIS/WES Revision:</b> {{ a.ois_revision }}</td><td colspan="2"><b>{{ s1.ois_check.text|truncatechars:60 }}</b> {% if a.ois_current == 'yes' %}☑ Yes ☐ No{% elif a.ois_current == 'no' %}☐ Yes ☑ No{% else %}☐ Yes ☐ No{% endif %}</td></tr>
+  </table>
+  <div class="small">{{ s1.legend.fail }} · {{ s1.legend.pass }} · {{ s1.legend.na }} · ช่องว่าง = ยังไม่ได้ตรวจ</div>
+  <table>
+    <colgroup><col style="width:34%">{% for o in occs %}<col>{% endfor %}</colgroup>
+    <thead><tr><th>{{ s1.frequency_label }}</th>{% for o in occs %}<th class="c">{{ o }}</th>{% endfor %}</tr></thead>
+    <tr class="sec"><td colspan="{{ occs|length|add:1 }}" class="maj">{{ s1.major_response.text }}</td></tr>
+    {% for r in s1_rows %}{% if r.first_minor %}<tr class="sec"><td colspan="{{ occs|length|add:1 }}" class="min">{{ s1.minor_response.text }}</td></tr>{% endif %}
+    <tr><td>{{ r.text }}</td>{% for c in r.cells %}<td class="c {% if c == '√' %}pass{% elif c|slice:':1' == '×' %}fail{% endif %}">{{ c }}</td>{% endfor %}</tr>{% endfor %}
+  </table>
+  {% if timing %}<h2>การจับเวลา (วินาที รวมเวลาเดิน)</h2>
+  <table><thead><tr><th>ครั้งที่สังเกต</th><th>รอบที่ใช้/ทั้งหมด</th><th>เฉลี่ย</th><th>ต่ำสุด</th><th>สูงสุด</th><th>Standard Time</th><th>Takt Time</th><th>ผลประเมิน</th><th>รอบที่ไม่ใช้ / Manual / หยุดชั่วคราว</th></tr></thead>
+  {% for t in timing %}<tr><td class="c">{{ t.observation }}</td><td class="c">{{ t.count_used }}/{{ t.count_total }}</td><td class="c">{{ t.avg|floatformat:2 }}</td><td class="c">{{ t.min|floatformat:2 }}</td><td class="c">{{ t.max|floatformat:2 }}</td>
+    <td>{{ t.standard_time|default:"ไม่ระบุ" }} <span class="small">{{ t.standard_time_source }}</span></td><td>{{ t.takt_time|default:"ไม่ระบุ" }} <span class="small">{{ t.takt_time_source }}</span></td><td>{{ t.evaluation }}</td>
+    <td class="small">{% for l in t.laps %}{% if not l.valid or l.source == 'manual' or l.paused %}รอบ {{ l.lap_no }} {{ l.seconds|floatformat:2 }}s{% if not l.valid %} ไม่ใช้: {{ l.invalid_reason }}{% endif %}{% if l.source == 'manual' %} Manual: {{ l.manual_reason }}{% endif %}{% if l.paused %} หยุด {{ l.paused|floatformat:2 }}s ({{ l.pause_reasons|join:", " }}){% endif %}; {% endif %}{% endfor %}</td></tr>{% endfor %}</table>{% endif %}
+  <h2>ปัญหาที่พบจากการสังเกต</h2>
+  <table><thead><tr><th style="width:12%">Issue</th><th style="width:12%">ข้อ / ครั้งที่</th><th>รายละเอียด</th><th style="width:14%">ผู้รับผิดชอบ</th><th style="width:10%">สถานะ</th></tr></thead>
+  {% for o in s1_issues %}<tr><td>{{ o.issue.issue_no }}</td><td>{{ o.item_key }} · {{ o.occurrence }}</td><td>{{ o.issue.title }}</td><td>{{ o.issue.owner_name }}</td><td>{{ o.issue.status_th }}</td></tr>{% empty %}<tr><td colspan="5">ไม่มี</td></tr>{% endfor %}</table>
+  {% if followups %}<h2>การตอบสนองความผิดปกติหลัก</h2><table><thead><tr><th>ข้อ/ครั้งที่</th><th>แจ้งหัวหน้า</th><th>การจัดการทันที</th><th>ฝึกอบรม</th><th>ตรวจรับรองใหม่</th><th>สถานะ</th></tr></thead>
+  {% for f in followups %}<tr><td>{{ f.item_key }} · {{ f.occurrence }}</td><td>{{ f.supervisor_notified }}</td><td>{{ f.immediate_action }}</td><td>{{ f.training_by }} {{ f.training_at|date:"d/m/Y H:i" }} {{ f.training_detail }}</td><td>{{ f.recert_by }} {{ f.recert_at|date:"d/m/Y H:i" }} {{ f.recert_result }}</td><td>{{ f.get_stage_display }}</td></tr>{% endfor %}</table>{% endif %}
+  <table style="margin-top:6px"><tr>
+    <td class="small" style="width:33%">{% for l in s1.labels %}{% if l.role == 'employee_major' %}{{ l.text }}{% endif %}{% endfor %}<div class="sig">{% if sigs.employee_major %}<img src="{{ sigs.employee_major.img }}" alt=""><br>{{ sigs.employee_major.s.signer_name }} · {{ sigs.employee_major.s.signed_at|date:"d/m/Y H:i" }}{% endif %}</div></td>
+    <td class="small" style="width:33%">{% for l in s1.labels %}{% if l.role == 'employee_minor' %}{{ l.text }}{% endif %}{% endfor %}<div class="sig">{% if sigs.employee_minor %}<img src="{{ sigs.employee_minor.img }}" alt=""><br>{{ sigs.employee_minor.s.signer_name }} · {{ sigs.employee_minor.s.signed_at|date:"d/m/Y H:i" }}{% endif %}</div></td>
+    <td class="small">{% for l in s1.labels %}{% if l.role == 'employee_recert' %}{{ l.text }}{% endif %}{% endfor %}<div class="sig small">{% for f in followups %}{% for s in f.signatures.all %}{% if not s.superseded_at %}{{ s.get_role_display }}: {{ s.signer_name }} {{ s.signed_at|date:"d/m/Y H:i" }}<br>{% endif %}{% endfor %}{% endfor %}</div></td>
+  </tr></table>
+</div>
+{% endwith %}
+
+{% with s=snap.s2 %}
+<div class="page">
+  <h1>{{ s.title }}</h1>
+  <table><colgroup><col style="width:8%"><col><col style="width:8%"></colgroup>
+  {% for sec in s2 %}<tr class="sec"><td colspan="3">{{ sec.title }}</td></tr>
+  {% for i in sec.items %}<tr><td class="c">{{ i.code }}</td><td>{{ i.text }}</td><td class="c {% if i.mark == '√' %}pass{% elif i.mark == '×' %}fail{% endif %}">{{ i.mark }}</td></tr>{% endfor %}{% endfor %}</table>
+  <h2>{{ s.log_title.text }}</h2>
+  <table><thead><tr>{% for c in s.table_columns %}<th>{{ c.text }}</th>{% endfor %}</tr></thead>
+  {% for i in s2_issues %}<tr><td class="c">{{ forloop.counter }}</td><td class="c">{{ i.item_code }}</td><td>{{ i.issue_no }} {{ i.title }}</td><td>{{ i.owner_name|default:i.owner|default:"" }}</td><td>{{ i.permanent_action|default:i.containment }}</td><td>{{ i.status_th }}{% if gbr and i.gbr %} · {{ i.gbr }}{% endif %}</td></tr>{% empty %}<tr><td colspan="6">ไม่มี</td></tr>{% endfor %}</table>
+  <p class="small pre">{{ s.note.text }}</p>
+</div>
+{% endwith %}
+
+{% with s=snap.s3 %}
+<div class="page">
+  <h1>{{ s.title }}</h1>
+  <p class="small pre">{{ s.goal.text }}</p>
+  <table><colgroup><col style="width:3%"><col style="width:21%"><col style="width:21%"><col style="width:17%"><col style="width:5%"><col style="width:17%"><col style="width:5%"><col style="width:11%"></colgroup>
+  <thead><tr><th>#</th><th>{{ s.col_question }}</th><th>{{ s.col_expected }}</th><th>คำตอบพนักงาน</th><th>ก่อนสอน</th><th>สิ่งที่ชี้แนะ</th><th>หลังสอน</th><th>ผู้ประเมิน</th></tr></thead>
+  {% for q in s3 %}<tr><td class="c">{{ q.no }}</td><td>{{ q.text }}</td><td class="pre">{{ q.expected }}</td><td>{{ q.a.employee_answer }}</td>
+    <td class="c">{% if q.a.before == 'pass' %}√{% elif q.a.before == 'fail' %}×{% endif %}</td><td>{{ q.a.coaching }}</td><td class="c">{% if q.a.after == 'pass' %}√{% elif q.a.after == 'fail' %}×{% endif %}</td>
+    <td class="small">{% if q.a.evaluator %}{{ q.a.evaluator.get_full_name|default:q.a.evaluator.username }} {{ q.a.evaluated_at|date:"d/m/Y H:i" }}{% endif %}</td></tr>{% endfor %}</table>
+  <h2>{{ s.suggestion_title.text }}</h2>
+  <table><thead><tr>{% for c in s.suggestion_columns %}<th>{{ c.text }}</th>{% endfor %}</tr></thead>
+  {% for g in suggestions %}<tr><td class="c">{{ forloop.counter }}</td><td>{{ g.description }}</td><td>{{ g.suggestion }}</td><td>{{ g.owner_name }}</td></tr>{% empty %}<tr><td colspan="4">ไม่มี</td></tr>{% endfor %}</table>
+  <table style="margin-top:6px"><tr>
+    <td class="small" style="width:50%">{{ s.signature.text }}<div class="sig">{% if sigs.supervisor_s3 %}<img src="{{ sigs.supervisor_s3.img }}" alt=""><br>{{ sigs.supervisor_s3.s.signer_name }} · {{ sigs.supervisor_s3.s.signed_at|date:"d/m/Y H:i" }}{% endif %}</div></td>
+    <td class="small">ลายเซ็นของพนักงาน<div class="sig">{% if sigs.employee_s3 %}<img src="{{ sigs.employee_s3.img }}" alt=""><br>{{ sigs.employee_s3.s.signer_name }} · {{ sigs.employee_s3.s.signed_at|date:"d/m/Y H:i" }}{% endif %}</div></td></tr></table>
+</div>
+{% endwith %}
+
+{% with s=snap.s4 %}
+<div class="page">
+  <h1>{{ s.title }}</h1>
+  <p class="small pre">{{ s.goal.text }}</p>
+  <table><tr>{% for st in s.steps %}<td class="small">{{ st.no }}. {{ st.text }}</td>{% endfor %}</tr></table>
+  <h2>{{ s.discussion_title.text }}</h2>
+  <table><colgroup><col style="width:13%"><col style="width:17%"><col style="width:22%"><col style="width:20%"><col style="width:22%"><col style="width:6%"></colgroup>
+  <thead><tr>{% for c in s.columns %}<th class="pre">{{ c }}</th>{% endfor %}<th>คำตอบจริง</th><th>การชี้แนะ</th><th>ผล</th></tr></thead>
+  {% for c in s4 %}<tr><td>{% ifchanged c.category %}{{ c.category }}{% endifchanged %}</td><td>{{ c.case }}</td><td>{{ c.answer }}</td><td>{{ c.r.employee_answer }}</td><td>{{ c.r.coaching }}</td><td class="c">{% if c.r.result == 'pass' %}√{% elif c.r.result == 'fail' %}×{% endif %}</td></tr>{% endfor %}</table>
+  <h2>{{ s.record_title.text }}</h2>
+  <table><thead><tr><th style="width:12%">ประเภท</th><th>{{ s.record_columns.0 }}</th><th>คำตอบ/การจัดการ</th><th>การชี้แนะ</th><th>{{ s.record_columns.1 }}</th><th style="width:12%">Issue</th></tr></thead>
+  {% for r in own %}<tr><td>{% if r.is_real_event %}เกิดขึ้นจริง{% else %}สถานการณ์สมมติ{% endif %}</td><td>{{ r.case_text }}</td><td>{{ r.employee_answer }}</td><td>{{ r.coaching }}</td><td>{{ r.improvement }}</td><td>{{ r.issue.issue_no|default:"" }}</td></tr>{% empty %}<tr><td colspan="6">ไม่มี</td></tr>{% endfor %}</table>
+  <table style="margin-top:8px"><tr><td class="small" style="width:50%">ผู้ตรวจสอบรับรองผลตรวจทั้ง 4 ตาราง<div class="sig">{% if sigs.auditor %}<img src="{{ sigs.auditor.img }}" alt=""><br>{{ sigs.auditor.s.signer_name }} · {{ sigs.auditor.s.signed_at|date:"d/m/Y H:i" }}{% endif %}</div></td>
+    <td class="small">สถานะ: {{ a.status_th }} · Rev {{ a.revision }}{% for r in revisions %}<br>Rev {{ r.revision }} → {{ r.revision|add:1 }}: {{ r.reason }} ({{ r.created_by }} {{ r.created_at|date:"d/m/Y H:i" }}){% endfor %}
+      <br>พิมพ์เมื่อ {{ printed_at|date:"d/m/Y H:i" }} (Asia/Bangkok) · แม่แบบ {{ a.template.label }} · ต้นฉบับ {{ snap.source_file }}</td></tr></table>
+</div>
+{% endwith %}
+</body></html>

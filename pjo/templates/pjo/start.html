@@ -1,0 +1,40 @@
+{% extends "pjo/base.html" %}
+{% block title %}เริ่มตรวจ PJO · CPS PJO Audit{% endblock %}
+{% block content %}
+<div class="pagehead"><h1>เริ่มตรวจ PJO</h1></div>
+{% if not workshops %}<div class="notice err">บัญชีนี้ยังไม่มีสิทธิ์ Auditor หรือ TL/GL ใน Workshop ใด ติดต่อ Admin</div>{% else %}
+<form method="post" class="card">{% csrf_token %}
+  {% if plan %}<input type="hidden" name="plan" value="{{ plan.pk }}"><div class="notice info">เริ่มตรวจตามแผนวันที่ {{ plan.planned_date|date:"d/m/Y" }} · {{ plan.workshop.name }} {{ plan.station }}</div>{% endif %}
+  <h2 style="margin-top:0">1. เลือก Workshop (แม่แบบมาตรฐาน)</h2>
+  <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(220px,1fr))">
+  {% for w, t in workshops %}
+    <label class="card" style="margin:0;cursor:pointer;display:flex;gap:10px;align-items:flex-start;{% if not t %}opacity:.5{% endif %}">
+      <input type="radio" name="template" value="{{ t.pk }}" required {% if not t %}disabled{% endif %} {% if plan and plan.workshop_id == w.id %}checked{% endif %} style="width:22px;height:22px;margin-top:3px" data-ws="{{ w.pk }}">
+      <span><b style="color:var(--ink)">{{ w.name }}</b><br><small>{% if t %}{{ t.label }} · Published {{ t.published_at|date:"d/m/Y" }}{% else %}ยังไม่มีแม่แบบ Published{% endif %}</small></span>
+    </label>
+  {% endfor %}
+  </div>
+  <h2>2. ข้อมูลส่วนหัว</h2>
+  <div class="grid">
+    <div><label>วันที่</label><input type="date" name="audit_date" value="{{ today|date:'Y-m-d' }}" required></div>
+    <div><label>กะ</label><select name="shift"><option value="">-</option><option>A</option><option>B</option><option>C</option><option>Day</option><option>Night</option></select></div>
+    <div><label>Team</label><select name="team" id="teamsel"><option value="">-</option>{% for t in teams %}<option value="{{ t.pk }}" data-ws="{{ t.workshop_id }}" {% if plan.team_id == t.pk %}selected{% endif %}>{{ t }}</option>{% endfor %}</select></div>
+    <div><label>Group</label><input type="text" name="group"></div>
+    <div><label>Line</label><input type="text" name="line"></div>
+    <div><label>Station</label><input type="text" name="station" value="{{ plan.station|default:'' }}"></div>
+    <div><label>Model</label><input type="text" name="model"></div>
+    <div><label>พนักงานที่ถูกตรวจ</label><select name="employee" id="empsel"><option value="">- เลือกจากรายชื่อ -</option>{% for e in employees %}<option value="{{ e.pk }}" data-ws="{{ e.workshop_id }}" {% if plan.employee_id == e.pk %}selected{% endif %}>{{ e }}</option>{% endfor %}</select></div>
+    <div><label>หรือพิมพ์ชื่อพนักงาน</label><input type="text" name="employee_name"></div>
+    <div><label>TL/GL</label><input type="text" name="tlgl_name"></div>
+    <div><label>OIS/WES Revision</label><input type="text" name="ois_revision"></div>
+    <div class="wide"><label>ลิงก์ OIS/WES (ถ้ามี)</label><input type="url" name="ois_url" placeholder="https://"></div>
+  </div>
+  <p class="muted">ผู้ตรวจ: {{ request.user.get_full_name|default:request.user.username }} · Template Version บันทึกอัตโนมัติจากแม่แบบที่เลือก</p>
+  <div class="btnrow"><button class="btn primary">สร้าง Audit และเปิดแบบฟอร์ม</button></div>
+</form>
+<script>
+document.querySelectorAll('input[name=template]').forEach(r=>r.addEventListener('change',()=>{const ws=r.dataset.ws;
+  for(const sel of [document.getElementById('teamsel'),document.getElementById('empsel')])for(const o of sel.options){if(o.dataset.ws)o.hidden=o.dataset.ws!==ws;}}));
+</script>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,38 @@
+{% load static %}<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>{% block title %}CPS PJO Audit{% endblock %}</title>
+<link rel="stylesheet" href="{% static 'pjo/css/app.css' %}">
+{% block head %}{% endblock %}
+</head>
+<body>
+{% with u=request.resolver_match.url_name %}
+<div class="topbar"><button type="button" aria-label="เมนู" onclick="document.querySelector('.side').classList.toggle('open')">☰</button><b>CPS PJO Audit</b></div>
+<div class="shell">
+  <aside class="side" onclick="if(event.target.tagName==='A')this.classList.remove('open')">
+    <div class="brandmark">CPS PJO Audit<small>Standardized Work → PJO</small></div>
+    <nav>
+      <a href="{% url 'dashboard' %}" class="{% if u == 'dashboard' %}on{% endif %}">Dashboard</a>
+      <a href="{% url 'plans' %}" class="{% if u == 'plans' %}on{% endif %}">แผนและรายการตรวจ PJO</a>
+      <a href="{% url 'start' %}" class="{% if u == 'start' or u == 'audit_form' %}on{% endif %}">เริ่มตรวจ PJO</a>
+      <a href="{% url 'issues' %}" class="{% if u == 'issues' or u == 'issue_detail' %}on{% endif %}">ติดตามปัญหา</a>
+      <a href="{% url 'pending_signatures' %}" class="{% if u == 'pending_signatures' %}on{% endif %}">รายการรอลงนาม</a>
+      <a href="{% url 'templates' %}" class="{% if u == 'templates' or u == 'template_detail' %}on{% endif %}">จัดการแม่แบบและมาตรฐาน</a>
+      <a href="{% url 'reports' %}" class="{% if u == 'reports' %}on{% endif %}">รายงานและ Export</a>
+    </nav>
+    <div class="who"><b>{{ request.user.get_full_name|default:request.user.username }}</b>
+      {% for r in nav_roles %}{{ r }}{% if not forloop.last %}, {% endif %}{% empty %}ยังไม่มีบทบาท{% endfor %}
+      <form method="post" action="{% url 'logout' %}" style="margin-top:8px">{% csrf_token %}<button class="btn small" type="submit">ออกจากระบบ</button></form>
+    </div>
+  </aside>
+  <main class="main">
+    {% if messages %}<ul class="messages">{% for m in messages %}<li class="{{ m.tags }}">{{ m }}</li>{% endfor %}</ul>{% endif %}
+    {% block content %}{% endblock %}
+  </main>
+</div>
+{% endwith %}
+{% block scripts %}{% endblock %}
+</body>
+</html>

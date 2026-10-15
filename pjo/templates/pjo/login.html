@@ -1,0 +1,12 @@
+{% load static %}<!doctype html>
+<html lang="th"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>เข้าสู่ระบบ · CPS PJO Audit</title><link rel="stylesheet" href="{% static 'pjo/css/app.css' %}"></head>
+<body style="display:flex;align-items:center;justify-content:center;min-height:100vh;padding:16px">
+<form method="post" class="card" style="width:min(380px,100%)">{% csrf_token %}
+  <h1>CPS PJO Audit</h1><p class="muted">Standardized Work → PJO</p>
+  {% if form.errors %}<div class="notice err">ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง</div>{% endif %}
+  <p><label for="id_username">ชื่อผู้ใช้</label><input type="text" name="username" id="id_username" autocomplete="username" required autofocus></p>
+  <p><label for="id_password">รหัสผ่าน</label><input type="password" name="password" id="id_password" autocomplete="current-password" required></p>
+  <input type="hidden" name="next" value="{{ next }}">
+  <button class="btn primary" style="width:100%">เข้าสู่ระบบ</button>
+</form></body></html>
