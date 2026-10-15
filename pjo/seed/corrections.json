@@ -1,5 +1,22 @@
 [
- {"workshop": "PT_Battery", "code": "C01-PT-BATTERY-TITLE",
+ {
+  "workshop": "PT_Battery",
+  "code": "C01-PT-BATTERY-TITLE",
   "change_note": "แก้หัวตาราง (PT Sub Line) เป็น (PT Battery) ทั้ง 4 ตาราง ตามที่ผู้ดูแลยืนยัน 15/10/2026 (รายการรอยืนยัน P01)",
-  "replace_in_titles": [["(PT Sub Line)", "(PT Battery)"]]}
+  "replace_in_titles": [
+   [
+    "(PT Sub Line)",
+    "(PT Battery)"
+   ]
+  ]
+ },
+ {
+  "workshop": "PT_Battery",
+  "code": "C02-PT-BATTERY-S3-ANSWERS",
+  "change_note": "เติมคำตอบที่คาดหวังตาราง 3 ข้อ 2 และข้อ 4 ที่ขาดท้ายประโยคในไฟล์ Excel ตามที่ผู้ดูแลยืนยัน 15/10/2026 (รายการรอยืนยัน P20)",
+  "set_s3_expected": {
+   "S3-2": "พนักงานเข้าใจว่าหากไม่ทำตามลำดับขั้นตอน อาจเกิดความเสี่ยงด้านคุณภาพ หรือความปลอดภัย หรืออาจส่งผลต่อการผลิตได้",
+   "S3-4": "พนักงานเข้าใจระบบ 4M Change Management"
+  }
+ }
 ]

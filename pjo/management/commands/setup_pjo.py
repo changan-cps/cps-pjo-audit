@@ -19,6 +19,10 @@ def apply_correction(content, corr):
     for old, new in corr.get("replace_in_titles", []):
         for s in ("s1", "s2", "s3", "s4"):
             c[s]["title"] = c[s]["title"].replace(old, new)
+    for q in c["s3"]["questions"]:
+        if q["key"] in corr.get("set_s3_expected", {}):
+            q["expected"] = corr["set_s3_expected"][q["key"]]
+            q["expected_corrected_by"] = corr["code"]
     c.setdefault("corrections", []).append({"code": corr["code"], "note": corr["change_note"]})
     return c
 

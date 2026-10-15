@@ -563,7 +563,7 @@
     const rows = Object.entries(ST.findings).filter(([k]) => k.startsWith('S2-'));
     const uniq = []; const seen = {};
     rows.forEach(([k, f]) => { if (!seen[f.id]) { seen[f.id] = 1; uniq.push([k, f]); } });
-    const cols = s.table_columns.map(c => c.text);
+    const cols = s.table_columns.map(c => c.text === 'ผู้รับผิดชอบ' ? 'ผู้รับผิดชอบ (หน่วยงาน)' : c.text);
     const t = h('table', { class: 'tbl' }, h('tr', null, cols.map(c => h('th', { text: c }))));
     uniq.forEach(([k, f], i) => t.append(h('tr', null, h('td', { text: i + 1 }), h('td', { text: f.item_code || ITEMS[k.split('|')[0]].code }),
       h('td', null, h('a', { href: '/issues/' + f.id + '/', text: f.issue_no }), ' ', f.title), h('td', { text: f.owner || '–' }),
@@ -747,7 +747,7 @@
     const cont = h('textarea', { id: 'fd-cont', placeholder: 'สิ่งที่ทำทันทีหน้างาน' });
     const prio = h('select', { id: 'fd-prio' }, ['', 'สูง', 'กลาง', 'ต่ำ'].map(v => h('option', { value: v, text: v || '- ไม่ระบุ -' })));
     const owner = h('select', { id: 'fd-owner' }, h('option', { value: '', text: '- เลือกผู้ใช้ -' }), B.owners.map(o => h('option', { value: o.id, text: o.name })));
-    const ownerName = h('input', { id: 'fd-ownername', type: 'text', placeholder: 'หรือพิมพ์ชื่อ/หน่วยงาน' });
+    const ownerName = h('input', { id: 'fd-ownername', type: 'text', placeholder: ctx.sheet === 's2' ? 'หน่วยงาน/ทีม (ถ้าปัญหามาจากกระบวนการก่อนหน้า ให้ระบุทีมก่อนหน้า)' : 'หรือพิมพ์ชื่อ/หน่วยงาน' });
     const due = h('input', { id: 'fd-due', type: 'date' });
     const cam = h('input', { id: 'fd-cam', type: 'file', accept: 'image/*', capture: 'environment', class: 'sr' });
     const files = h('input', { id: 'fd-files', type: 'file', accept: 'image/*,application/pdf', multiple: true, class: 'sr' });
@@ -760,7 +760,7 @@
       h('label', { for: 'fd-title', text: 'รายละเอียดปัญหา *' }), title,
       h('div', { class: 'grid', style: 'margin-top:8px' },
         h('div', null, h('label', { for: 'fd-prio', text: 'ความสำคัญ (ผู้ตรวจกำหนด)' }), prio),
-        h('div', null, h('label', { for: 'fd-owner', text: 'ผู้รับผิดชอบ' }), owner, ownerName),
+        h('div', null, h('label', { for: 'fd-owner', text: ctx.sheet === 's2' ? 'ผู้รับผิดชอบ (หน่วยงานที่รับผิดชอบการปรับปรุง)' : 'ผู้รับผิดชอบ' }), owner, ownerName),
         h('div', null, h('label', { for: 'fd-due', text: 'กำหนดเสร็จ' }), due)),
       h('label', { for: 'fd-cont', text: 'การแก้ไขทันที', style: 'margin-top:8px' }), cont,
       h('label', { for: 'fd-desc', text: 'หมายเหตุ', style: 'margin-top:8px' }), desc);

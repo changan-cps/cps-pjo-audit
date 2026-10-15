@@ -88,10 +88,14 @@ class TemplateFidelityTests(Base):
             fresh = extract(f)
             t = PJOTemplate.objects.get(workshop__code=fresh["code"], version=1)
             self.assertEqual(t.content, fresh, f"{fresh['code']} differs from its source form")
+            # published = source + only the owner-confirmed corrections
+            from pjo.management.commands.setup_pjo import apply_correction
+            expected = fresh
+            for corr in json.loads((ROOT / "pjo/seed/corrections.json").read_text(encoding="utf8")):
+                if corr["workshop"] == fresh["code"]:
+                    expected = apply_correction(expected, corr)
             pub = PJOTemplate.objects.get(workshop__code=fresh["code"], status="published")
-            for s in ("s1", "s2", "s3", "s4"):  # published questions are still exactly the source questions
-                self.assertEqual({k: v for k, v in pub.content[s].items() if k != "title"},
-                                 {k: v for k, v in fresh[s].items() if k != "title"})
+            self.assertEqual(pub.content, expected, fresh["code"])
 
     def test_phase2_question_counts(self):
         for code, n in EXPECTED_S3.items():
@@ -120,12 +124,15 @@ class TemplateFidelityTests(Base):
         self.assertEqual(PendingItem.objects.get(code="P01-PT-BATTERY-TITLE").status, "resolved")
         v1 = PJOTemplate.objects.get(workshop__code="PT_Battery", version=1)
         v2 = PJOTemplate.objects.get(workshop__code="PT_Battery", status="published")
-        self.assertEqual((v1.status, v2.version), ("retired", 2))
+        self.assertEqual((v1.status, v2.version), ("retired", 3))
+        q = {x["key"]: x for x in v2.content["s3"]["questions"]}
+        self.assertTrue(q["S3-2"]["expected"].endswith("หรืออาจส่งผลต่อการผลิตได้"))
+        self.assertEqual(q["S3-4"]["expected"], "พนักงานเข้าใจระบบ 4M Change Management")
         self.assertIn("PT Sub Line", v1.content["s1"]["title"])  # source kept as imported
         for s in ("s1", "s2", "s3", "s4"):
             self.assertIn("(PT Battery)", v2.content[s]["title"])
             self.assertNotIn("PT Sub Line", v2.content[s]["title"])
-        self.assertEqual(v1.content["s3"]["questions"], v2.content["s3"]["questions"])  # only the titles changed
+        self.assertEqual([x["text"] for x in v1.content["s3"]["questions"]], [x["text"] for x in v2.content["s3"]["questions"]])
         # PT Sub Line Engine keeps its own title
         self.assertIn("(PT Sub Line)", PJOTemplate.objects.get(workshop__code="PT_Sub_Line_Engine", status="published").content["s1"]["title"])
 
@@ -142,12 +149,12 @@ class TemplateFidelityTests(Base):
     def test_confirmed_items_resolved_and_open_items_remain(self):
         from pjo.models import PendingItem
         open_codes = set(PendingItem.objects.filter(status="pending").values_list("code", flat=True))
-        self.assertEqual(open_codes, {"P04-NOTE-COLUMN", "P06-FREQUENCY", "P20-PT-BATTERY-TRUNCATED"})
+        self.assertEqual(open_codes, set())
 
     def test_setup_is_idempotent(self):
         call_command("setup_pjo", stdout=io.StringIO())
         call_command("setup_pjo", stdout=io.StringIO())
-        self.assertEqual(PJOTemplate.objects.count(), 8)  # 7 sources + PT Battery corrected version
+        self.assertEqual(PJOTemplate.objects.count(), 9)  # 7 sources + 2 confirmed PT Battery corrections
 
 
 class MarkAndIssueTests(Base):

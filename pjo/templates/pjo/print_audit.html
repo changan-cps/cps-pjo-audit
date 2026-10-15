@@ -72,7 +72,7 @@ tr { page-break-inside: avoid; }
   {% for sec in s2 %}<tr class="sec"><td colspan="3">{{ sec.title }}</td></tr>
   {% for i in sec.items %}<tr><td class="c">{{ i.code }}</td><td>{{ i.text }}</td><td class="c {% if i.mark == '√' %}pass{% elif i.mark == '×' %}fail{% endif %}">{{ i.mark }}</td></tr>{% endfor %}{% endfor %}</table>
   <h2>{{ s.log_title.text }}</h2>
-  <table><thead><tr>{% for c in s.table_columns %}<th>{{ c.text }}</th>{% endfor %}</tr></thead>
+  <table><thead><tr>{% for c in s.table_columns %}<th>{{ c.text }}{% if c.text == 'ผู้รับผิดชอบ' %} (หน่วยงาน){% endif %}</th>{% endfor %}</tr></thead>
   {% for i in s2_issues %}<tr><td class="c">{{ forloop.counter }}</td><td class="c">{{ i.item_code }}</td><td>{{ i.issue_no }} {{ i.title }}</td><td>{{ i.owner_name|default:i.owner|default:"" }}</td><td>{{ i.permanent_action|default:i.containment }}</td><td>{{ i.status_th }}{% if gbr %} · {{ i.gbr_auto }}{% endif %}</td></tr>{% empty %}<tr><td colspan="6">ไม่มี</td></tr>{% endfor %}</table>
   <p class="small pre">{{ s.note.text }}</p>
 </div>
