@@ -30,7 +30,7 @@ function seedDemo() {
 }
 const demo = process.argv.includes('--seed') ? seedDemo() : null;
 
-const SHIM = `<script>
+const SHIM = `<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><script>
 (function () {
   function runner() {
     var ok = null, fail = null;

@@ -1,0 +1,444 @@
+<script>
+/* Monthly plan form import: reads the paper form "แผนงานของ … ประจำเดือน …" from Excel (.xlsx) or PDF in the browser,
+   then sends one row per day to the server (plan_import) which checks it against weekends and factory holidays. */
+(function () {
+  'use strict';
+  var PDFJS = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/';
+  var MONTHS = [
+    [/^jan/i, /มกรา|ม\.ค/], [/^feb/i, /กุมภา|ก\.พ/], [/^mar/i, /มีนา|มี\.ค/], [/^apr/i, /เมษา|เม\.ย/], [/^may/i, /พฤษภา|พ\.ค/], [/^jun/i, /มิถุนา|มิ\.ย/],
+    [/^jul/i, /กรกฎา|ก\.ค/], [/^aug/i, /สิงหา|ส\.ค/], [/^sep/i, /กันยา|ก\.ย/], [/^oct/i, /ตุลา|ต\.ค/], [/^nov/i, /พฤศจิกา|พ\.ย/], [/^dec/i, /ธันวา|ธ\.ค/]];
+  var WS_ALIASES = [[/inspection/i, 'GA_Inspection'], [/battery/i, 'PT_Battery'], [/engine|sub\s*line/i, 'PT_Sub_Line_Engine'], [/body/i, 'BS'], [/paint/i, 'PS'],
+    [/logistic|^log\b/i, 'LOG'], [/general\s*assembly|^ga\b/i, 'GA'], [/^bs\b/i, 'BS'], [/^ps\b/i, 'PS']];
+  var LABEL_TH = { day: 'วันที่', team: 'ทีม', name: 'ชื่อพนักงาน', station: 'หมายเลขตำแหน่งงาน', level: 'ระดับตำแหน่งงาน', problems: 'จำนวนปัญหาที่เก็บได้', note: 'หมายเหตุ' };
+  var LABELS = [['day', /^วันที่/], ['team', /^ทีม|^team/i], ['level', /^ระดับ/], ['problems', /^จำนวนปัญหา/], ['station', /ตำแหน่งงาน|^สถานี|^station/i],
+    ['name', /^ชื่อ|^name/i], ['note', /^หมายเหตุ|^remark/i]];
+
+  // ------------------------------------------------------------ xlsx (zip + XML) reader
+  function unzip(buf) {
+    var dv = new DataView(buf), u8 = new Uint8Array(buf), eocd = -1;
+    for (var i = u8.length - 22; i >= Math.max(0, u8.length - 65557); i--) if (dv.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
+    if (eocd < 0) throw new Error('ไฟล์นี้ไม่ใช่ Excel .xlsx (ถ้าเป็น .xls ให้เปิดแล้ว Save As เป็น .xlsx)');
+    var n = dv.getUint16(eocd + 10, true), off = dv.getUint32(eocd + 16, true), files = {}, dec = new TextDecoder();
+    for (var k = 0; k < n; k++) {
+      var nlen = dv.getUint16(off + 28, true);
+      files[dec.decode(u8.subarray(off + 46, off + 46 + nlen))] = { method: dv.getUint16(off + 10, true), csize: dv.getUint32(off + 20, true), lho: dv.getUint32(off + 42, true) };
+      off += 46 + nlen + dv.getUint16(off + 30, true) + dv.getUint16(off + 32, true);
+    }
+    return function read(name) {
+      var f = files[name];
+      if (!f) return Promise.resolve(null);
+      var start = f.lho + 30 + dv.getUint16(f.lho + 26, true) + dv.getUint16(f.lho + 28, true), data = u8.slice(start, start + f.csize);
+      if (f.method === 0) return Promise.resolve(dec.decode(data));
+      if (typeof DecompressionStream === 'undefined') return Promise.reject(new Error('เบราว์เซอร์นี้อ่าน Excel ไม่ได้ กรุณาอัปเดต Chrome/Safari'));
+      return new Response(new Blob([data]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer().then(function (b) { return dec.decode(b); });
+    };
+  }
+  function xml(text) { return new DOMParser().parseFromString(text, 'application/xml'); }
+  function tags(node, name) { return Array.prototype.filter.call(node.getElementsByTagName('*'), function (e) { return e.localName === name; }); }
+  function colIndex(ref) { var m = /^([A-Z]+)(\d+)$/.exec(ref), c = 0; for (var i = 0; i < m[1].length; i++) c = c * 26 + m[1].charCodeAt(i) - 64; return [Number(m[2]) - 1, c - 1]; }
+
+  PJO.readXlsx = function (buf) {
+    var read = unzip(buf);
+    return Promise.all([read('xl/workbook.xml'), read('xl/_rels/workbook.xml.rels'), read('xl/sharedStrings.xml')]).then(function (r) {
+      if (!r[0]) throw new Error('ไฟล์นี้ไม่ใช่ Excel .xlsx');
+      var rels = {}, shared = [];
+      tags(xml(r[1]), 'Relationship').forEach(function (e) { rels[e.getAttribute('Id')] = e.getAttribute('Target'); });
+      if (r[2]) tags(xml(r[2]), 'si').forEach(function (si) {
+        shared.push(tags(si, 't').filter(function (t) { return t.parentNode.localName !== 'rPh'; }).map(function (t) { return t.textContent; }).join(''));
+      });
+      var sheets = tags(xml(r[0]), 'sheet').map(function (s) {
+        var rid = s.getAttribute('r:id') || s.getAttributeNS('http://schemas.openxmlformats.org/officeDocument/2006/relationships', 'id');
+        var target = rels[rid] || '';
+        return { name: s.getAttribute('name'), path: target.charAt(0) === '/' ? target.slice(1) : 'xl/' + target.replace(/^\.\//, '') };
+      });
+      return Promise.all(sheets.map(function (s) { return read(s.path); })).then(function (texts) {
+        return sheets.map(function (s, i) {
+          var rows = [];
+          if (texts[i]) tags(xml(texts[i]), 'c').forEach(function (c) {
+            var rc = colIndex(c.getAttribute('r')), t = c.getAttribute('t'), v = tags(c, 'v')[0], val = '';
+            if (t === 's') val = v ? shared[Number(v.textContent)] || '' : '';
+            else if (t === 'inlineStr') val = tags(c, 't').map(function (x) { return x.textContent; }).join('');
+            else val = v ? v.textContent : '';
+            (rows[rc[0]] = rows[rc[0]] || [])[rc[1]] = String(val).trim();
+          });
+          return { name: s.name, rows: rows };
+        });
+      });
+    });
+  };
+
+  // ------------------------------------------------------------ PDF reader (pdf.js, text positions → same grid)
+  function loadScript(src) {
+    return new Promise(function (ok, bad) { var s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = function () { bad(new Error('โหลดตัวอ่าน PDF ไม่ได้ (ต้องต่ออินเทอร์เน็ต)')); }; document.head.append(s); });
+  }
+  PJO.loadPdfjs = function () {
+    if (window.pdfjsLib) return Promise.resolve(window.pdfjsLib);
+    // the worker script runs on the main thread (globalThis.pdfjsWorker) – Apps Script pages cannot start cross-origin workers
+    return loadScript(PDFJS + 'pdf.worker.min.js').then(function () { return loadScript(PDFJS + 'pdf.min.js'); }).then(function () {
+      window.pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS + 'pdf.worker.min.js';
+      return window.pdfjsLib;
+    });
+  };
+  function lines(items, tol) {
+    var out = [];
+    items.slice().sort(function (a, b) { return b.y - a.y || a.x - b.x; }).forEach(function (it) {
+      var l = out.filter(function (x) { return Math.abs(x.y - it.y) <= tol; })[0];
+      if (l) l.items.push(it); else out.push({ y: it.y, items: [it] });
+    });
+    out.forEach(function (l) { l.text = joinItems(l.items); });
+    return out;
+  }
+  function joinItems(items) {
+    if (!items.length) return '';
+    // reading direction of the text (normal, or rotated 90° in narrow day columns)
+    var vert = items.filter(function (i) { return Math.abs(i.dy) > Math.abs(i.dx); }).length > items.length / 2;
+    var up = vert && items.reduce(function (a, i) { return a + i.dy; }, 0) > 0;
+    // along = position along the text, across = which line (lines of rotated text run right-to-left for +90°)
+    function along(i) { return vert ? (up ? i.y : -i.y) : i.x; }
+    function across(i) { return vert ? (up ? i.x : -i.x) : -i.y; }
+    // Thai vowel/tone marks sit above/below the base letter: never start a new line or a space for them
+    function mark(i) { return /^[\u0e31\u0e34-\u0e3a\u0e47-\u0e4e]+$/.test(i.str); }
+    var base = items.filter(function (i) { return !mark(i); }), lns = [];
+    base.slice().sort(function (a, b) { return across(a) - across(b); }).forEach(function (it) {
+      var l = lns.filter(function (x) { return Math.abs(x.c - across(it)) <= it.size * 0.6; })[0];
+      if (l) l.items.push(it); else lns.push({ c: across(it), items: [it] });
+    });
+    if (!lns.length) lns.push({ c: 0, items: [] });
+    items.filter(mark).forEach(function (m) {
+      var bestL = lns[0], bd = Infinity;
+      lns.forEach(function (l) { l.items.forEach(function (b) { var d = Math.abs(along(b) - along(m)) + Math.abs(across(b) - across(m)) * 0.3; if (d < bd) { bd = d; bestL = l; } }); });
+      bestL.items.push(m);
+    });
+    var s = '';
+    lns.forEach(function (l, li) {
+      var prev = null;
+      if (li) s += ' ';
+      l.items.sort(function (a, b) { return along(a) - along(b); }).forEach(function (it) {
+        if (prev && !mark(it)) {
+          var gap = vert ? Math.abs(along(it) - along(prev)) - (prev.w + it.w) / 2 : it.x0 - prev.x1;
+          if (gap > it.size * 0.25) s += ' ';
+        }
+        s += it.str; if (!mark(it)) prev = it;
+      });
+    });
+    return s.replace(/[\u0000-\u001f\u007f]/g, '').replace(/\s+/g, ' ').trim();
+  }
+  PJO.readPdf = function (buf) {
+    return PJO.loadPdfjs().then(function (lib) {
+      return lib.getDocument({ data: new Uint8Array(buf), cMapUrl: PDFJS + 'cmaps/', cMapPacked: true, standardFontDataUrl: PDFJS + 'standard_fonts/', isEvalSupported: false }).promise;
+    }).then(function (doc) {
+      var pages = [];
+      for (var i = 1; i <= Math.min(doc.numPages, 6); i++) pages.push(doc.getPage(i).then(function (pg) {
+        return Promise.all([pg.getTextContent(), pg.getOperatorList().catch(function () { return null; })]);
+      }));
+      return Promise.all(pages);
+    }).then(function (contents) {
+      var sheets = contents.map(function (pair, pi) {
+        var tc = pair[0], segs = pair[1] ? horizontalSegments(pair[1], window.pdfjsLib.OPS) : [];
+        var items = tc.items.filter(function (it) { return it.str && it.str.trim(); }).map(function (it) {
+          var t = it.transform, size = Math.hypot(t[2], t[3]) || Math.hypot(t[0], t[1]), dl = Math.hypot(t[0], t[1]) || 1;
+          var dx = t[0] / dl, dy = t[1] / dl, ux = t[2] / (Math.hypot(t[2], t[3]) || 1), uy = t[3] / (Math.hypot(t[2], t[3]) || 1);
+          var cx = t[4] + dx * it.width / 2 + ux * size * 0.35, cy = t[5] + dy * it.width / 2 + uy * size * 0.35;
+          return { str: it.str, x: cx, y: cy, size: size, x0: t[4], x1: t[4] + dx * it.width, dx: dx, dy: dy, w: it.width };
+        });
+        return { name: 'PDF หน้า ' + (pi + 1), rows: pdfGrid(items, segs), items: items.length,
+                 garbled: items.some(function (i) { return /[\u0000-\u001f\uE000-\uF8FF\uFFFD]/.test(i.str); }) };
+      });
+      if (!sheets.some(function (s) { return s.items > 5; })) throw new Error('PDF นี้เป็นภาพสแกน อ่านข้อความไม่ได้ — กรุณาใช้ไฟล์ Excel หรือ PDF ที่ Save/Export จาก Excel');
+      return sheets;
+    });
+  };
+  /** Horizontal table borders (lines and thin/filled rectangles) in PDF user space – used to find the real row edges. */
+  function horizontalSegments(ol, OPS) {
+    var out = [], stack = [], m = [1, 0, 0, 1, 0, 0];
+    function mul(a, b) { return [a[0] * b[0] + a[2] * b[1], a[1] * b[0] + a[3] * b[1], a[0] * b[2] + a[2] * b[3], a[1] * b[2] + a[3] * b[3], a[0] * b[4] + a[2] * b[5] + a[4], a[1] * b[4] + a[3] * b[5] + a[5]]; }
+    function pt(x, y) { return [m[0] * x + m[2] * y + m[4], m[1] * x + m[3] * y + m[5]]; }
+    function seg(a, b) {
+      if (Math.abs(a[1] - b[1]) < 0.8 && Math.abs(a[0] - b[0]) > 2) out.push({ y: (a[1] + b[1]) / 2, x0: Math.min(a[0], b[0]), x1: Math.max(a[0], b[0]) });
+      else if (Math.abs(a[0] - b[0]) < 0.8 && Math.abs(a[1] - b[1]) > 2) out.push({ v: true, x: (a[0] + b[0]) / 2, y0: Math.min(a[1], b[1]), y1: Math.max(a[1], b[1]) });
+    }
+    for (var i = 0; i < ol.fnArray.length; i++) {
+      var fn = ol.fnArray[i], args = ol.argsArray[i];
+      if (fn === OPS.save) stack.push(m.slice());
+      else if (fn === OPS.restore) m = stack.pop() || [1, 0, 0, 1, 0, 0];
+      else if (fn === OPS.transform) m = mul(m, args);
+      else if (fn === OPS.constructPath) {
+        var ops = args[0], c = args[1], k = 0, cur = null, start = null;
+        for (var j = 0; j < ops.length; j++) {
+          var op = ops[j];
+          if (op === OPS.moveTo) { cur = start = pt(c[k], c[k + 1]); k += 2; }
+          else if (op === OPS.lineTo) { var nx = pt(c[k], c[k + 1]); k += 2; if (cur) seg(cur, nx); cur = nx; }
+          else if (op === OPS.rectangle) {
+            var a = pt(c[k], c[k + 1]), b = pt(c[k] + c[k + 2], c[k + 1] + c[k + 3]); k += 4;
+            seg([a[0], a[1]], [b[0], a[1]]); seg([a[0], b[1]], [b[0], b[1]]); seg([a[0], a[1]], [a[0], b[1]]); seg([b[0], a[1]], [b[0], b[1]]);
+          }
+          else if (op === OPS.curveTo) { cur = pt(c[k + 4], c[k + 5]); k += 6; }
+          else if (op === OPS.curveTo2 || op === OPS.curveTo3) { cur = pt(c[k + 2], c[k + 3]); k += 4; }
+          else if (op === OPS.closePath) { if (cur && start) seg(cur, start); cur = start; }
+        }
+      }
+    }
+    return out;
+  }
+
+  function pdfGrid(items, segs) {
+    if (!items.length) return [];
+    var size = items.map(function (i) { return i.size; }).sort(function (a, b) { return a - b; })[Math.floor(items.length / 2)];
+    // the day-number row: the line holding the most different numbers 1..31
+    var nums = items.filter(function (i) { return /^\d{1,2}$/.test(i.str.trim()) && +i.str >= 1 && +i.str <= 31; });
+    var best = null;
+    lines(nums, size * 0.6).forEach(function (l) {
+      var seen = {}; l.items.forEach(function (i) { seen[+i.str] = i; });
+      var n = Object.keys(seen).length;
+      if (n >= 20 && (!best || n > best.n)) best = { n: n, y: l.y, cols: seen };
+    });
+    if (!best) return [];
+    var days = Object.keys(best.cols).map(Number).sort(function (a, b) { return a - b; });
+    var cx = days.map(function (d) { return best.cols[d].x; });
+    // column edges = vertical borders through the day row (numbers may sit left/right in their cells)
+    var vx = [];
+    (segs || []).forEach(function (g) { if (g.v && g.y0 <= best.y && g.y1 >= best.y && !vx.some(function (x) { return Math.abs(x - g.x) < 1.5; })) vx.push(g.x); });
+    vx.sort(function (a, b) { return a - b; });
+    var spans = cx.map(function (x) {
+      var l = vx.filter(function (e) { return e < x; }).pop(), r = vx.filter(function (e) { return e > x; })[0];
+      return l !== undefined && r !== undefined ? [l, r] : null;
+    });
+    if (spans.every(Boolean)) cx = spans.map(function (sp) { return (sp[0] + sp[1]) / 2; });
+    var gap = (cx[cx.length - 1] - cx[0]) / Math.max(1, cx.length - 1);
+    var leftEdge = spans.every(Boolean) ? spans[0][0] : cx[0] - gap / 2, rightEdge = spans.every(Boolean) ? spans[spans.length - 1][1] : cx[cx.length - 1] + gap / 2;
+    function colOf(x) {
+      if (x < leftEdge || x > rightEdge) return -1;
+      if (spans.every(Boolean)) { for (var i = 0; i < spans.length; i++) if (x >= spans[i][0] && x <= spans[i][1]) return i; return -1; }
+      var bi = 0; cx.forEach(function (c, i) { if (Math.abs(c - x) < Math.abs(cx[bi] - x)) bi = i; }); return bi;
+    }
+    // row edges = horizontal borders that run across the day columns
+    var edges = [];
+    (segs || []).forEach(function (g) {
+      if (g.v || Math.min(g.x1, rightEdge) - Math.max(g.x0, leftEdge) < gap * 0.6) return;
+      if (!edges.some(function (e) { return Math.abs(e - g.y) < 1.5; })) edges.push(g.y);
+    });
+    edges.sort(function (a, b) { return b - a; });
+    var labelItems = items.filter(function (i) { return i.x < leftEdge; });
+    var bands = [];
+    var dayTop = edges.filter(function (e) { return e > best.y; }).pop(), dayBottom = edges.filter(function (e) { return e < best.y; })[0];
+    if (dayTop !== undefined && dayBottom !== undefined) {
+      // table with borders: every band between two borders below the day row is one form row; label text names it,
+      // and when the label cannot be read (some Thai PDFs) the standard form order is used
+      bands.push({ key: 'day', y: best.y, top: dayTop, bottom: dayBottom, text: 'วันที่' });
+      var below = edges.filter(function (e) { return e <= dayBottom; }), order = ['team', 'name', 'station', 'level', 'problems', 'note'];
+      for (var k = 0; k + 1 < below.length && bands.length < 7; k++) {
+        var top = below[k], bot = below[k + 1];
+        if (top - bot < 3) continue;
+        var lt = joinItems(labelItems.filter(function (i) { return i.y <= top && i.y > bot; }));
+        var key = labelKey(lt) || order[bands.length - 1];
+        if (!key || bands.some(function (x) { return x.key === key; })) key = order.filter(function (o) { return !bands.some(function (x) { return x.key === o; }); })[0];
+        if (!key) break;
+        bands.push({ key: key, y: (top + bot) / 2, top: top, bottom: bot, text: LABEL_TH[key] });
+      }
+    } else {
+      var labelLines = lines(labelItems.filter(function (i) { return i.y <= best.y + size; }), size * 0.6)
+        .map(function (l) { l.key = labelKey(l.text); return l; }).filter(function (l) { return l.key; });
+      labelLines.sort(function (a, b) { return b.y - a.y; }).forEach(function (l) { if (!bands.some(function (b) { return b.key === l.key; })) bands.push(l); });
+      if (!bands.some(function (b) { return b.key === 'day'; })) bands.unshift({ key: 'day', y: best.y, text: 'วันที่' });
+      bands.forEach(function (b, i) {
+        b.top = i ? (bands[i - 1].y + b.y) / 2 : b.y + size;
+        b.bottom = i < bands.length - 1 ? (b.y + bands[i + 1].y) / 2 : b.y - Math.max((bands[i - 1] ? bands[i - 1].y - b.y : 40) * 1.2, 40);
+      });
+    }
+    bands.forEach(function (b) { b.cells = cx.map(function () { return []; }); });
+    items.forEach(function (it) {
+      var c = colOf(it.x);
+      if (c < 0) return;
+      var b = bands.filter(function (b) { return it.y <= b.top && it.y > b.bottom; })[0];
+      if (b) b.cells[c].push(it);
+    });
+    var top = bands[0].top;
+    var rows = lines(items.filter(function (i) { return i.y > top; }), size * 0.6).map(function (l) { return [l.text]; });
+    bands.forEach(function (b) {
+      rows.push([b.text].concat(b.key === 'day' ? days.map(String) : b.cells.map(function (cell) { return joinItems(cell); })));
+    });
+    return rows;
+  }
+
+  // ------------------------------------------------------------ the form → { month, workshop, days }
+  function labelKey(text) {
+    var t = String(text || '').replace(/\s+/g, '');
+    for (var i = 0; i < LABELS.length; i++) if (LABELS[i][1].test(t)) return LABELS[i][0];
+    return null;
+  }
+  function monthOf(text) {
+    var t = String(text || ''), m = null;
+    var year = /(25\d{2}|20\d{2})/.exec(t);
+    var words = t.replace(/[.]{2,}/g, ' ').split(/[\s,]+/);
+    for (var i = 0; i < MONTHS.length && m === null; i++) {
+      if (words.some(function (w) { return MONTHS[i][0].test(w.replace(/[^A-Za-z]/g, '')) && w.replace(/[^A-Za-z]/g, '').length >= 3; }) || MONTHS[i][1].test(t)) m = i + 1;
+    }
+    if (m === null) { var num = /เดือน\s*[.]*\s*(\d{1,2})\b/.exec(t); if (num && +num[1] >= 1 && +num[1] <= 12) m = +num[1]; }
+    if (m === null || !year) return '';
+    var y = +year[1]; if (y > 2400) y -= 543;
+    return y + '-' + (m < 10 ? '0' : '') + m;
+  }
+  PJO.workshopFromText = function (text, workshops) {
+    var t = String(text || '');
+    var m = /ของ\s*(.+?)\s*ประจำเดือน/.exec(t);
+    var name = (m ? m[1] : t).trim();
+    var direct = (workshops || []).filter(function (w) { return name.toLowerCase() === String(w.name).toLowerCase() || name === w.code; })[0];
+    if (direct) return direct.code;
+    for (var i = 0; i < WS_ALIASES.length; i++) if (WS_ALIASES[i][0].test(name)) return WS_ALIASES[i][1];
+    return '';
+  };
+  PJO.parsePlanSheet = function (rows) {
+    var dayRow = -1, cols = {};
+    rows.forEach(function (r, ri) {
+      if (!r || dayRow >= 0) return;
+      var found = {};
+      r.forEach(function (v, ci) { if (/^\d{1,2}(\.0)?$/.test(String(v || '').trim())) { var d = parseInt(v, 10); if (d >= 1 && d <= 31 && !found[d]) found[d] = ci; } });
+      if (Object.keys(found).length >= 20) { dayRow = ri; cols = found; }
+    });
+    if (dayRow < 0) return null;
+    var firstCol = Math.min.apply(null, Object.keys(cols).map(function (d) { return cols[d]; }));
+    var labels = [];
+    for (var ri = dayRow; ri < rows.length && ri < dayRow + 40; ri++) {
+      var r = rows[ri] || [], text = '';
+      for (var ci = 0; ci < firstCol; ci++) if (r[ci]) { text = r[ci]; break; }
+      var key = ri === dayRow ? 'day' : labelKey(text);
+      if (key && !labels.some(function (l) { return l.key === key; })) labels.push({ key: key, row: ri });
+    }
+    labels.forEach(function (l, i) { l.end = i < labels.length - 1 ? labels[i + 1].row : Math.min(rows.length, l.row + 4); });
+    var head = rows.slice(0, dayRow).map(function (r) { return (r || []).filter(Boolean).join(' '); }).filter(Boolean);
+    var month = '';
+    head.slice().sort(function (a, b) { return (/เดือน/.test(b) ? 1 : 0) - (/เดือน/.test(a) ? 1 : 0); }).some(function (t) { month = monthOf(t); return !!month; });
+    var days = Object.keys(cols).map(Number).sort(function (a, b) { return a - b; }).map(function (d) {
+      var o = { day: d };
+      labels.forEach(function (l) {
+        if (l.key === 'day') return;
+        var parts = [];
+        for (var ri = l.row; ri < l.end; ri++) { var v = (rows[ri] || [])[cols[d]]; if (v && parts.indexOf(v) < 0) parts.push(v); }
+        o[l.key] = parts.join(' ').trim();
+      });
+      return o;
+    });
+    return { month: month, title: head.join(' \n '), labels: labels.map(function (l) { return l.key; }), days: days };
+  };
+  PJO.readPlanFile = function (file) {
+    return file.arrayBuffer().then(function (buf) {
+      var isPdf = /\.pdf$/i.test(file.name) || file.type === 'application/pdf';
+      if (!isPdf && !/\.xlsx$/i.test(file.name)) throw new Error('รองรับไฟล์ Excel (.xlsx) หรือ PDF เท่านั้น');
+      return (isPdf ? PJO.readPdf(buf) : PJO.readXlsx(buf)).then(function (sheets) {
+        var parsed = null;
+        sheets.some(function (s) { var p = PJO.parsePlanSheet(s.rows); if (p && p.labels.length >= 3) { parsed = p; parsed.sheet = s.name; parsed.garbled = !!s.garbled; } return !!parsed; });
+        if (!parsed) throw new Error('ไม่พบตารางแผนงานในไฟล์ (ต้องมีแถว วันที่ 1–31, ทีม, ชื่อพนักงาน, หมายเลขตำแหน่งงาน)');
+        var miss = ['team', 'name', 'station'].filter(function (k) { return parsed.labels.indexOf(k) < 0; });
+        if (miss.length) throw new Error('ไม่พบแถว ' + miss.map(function (k) { return { team: 'ทีม', name: 'ชื่อพนักงาน', station: 'หมายเลขตำแหน่งงาน' }[k]; }).join(', ') + ' ในไฟล์');
+        parsed.garbled = parsed.garbled || parsed.days.some(function (d) { return /[\uE000-\uF8FF\uFFFD]/.test(d.name || ''); });
+        parsed.kind = isPdf ? 'PDF' : 'Excel';
+        return parsed;
+      });
+    });
+  };
+
+  // ------------------------------------------------------------ import dialog
+  PJO.planImport = function (opts) {
+    var h = PJO.h, lk = opts.lookups, ws = lk.workshops.filter(function (w) { return w.can_create; });
+    var body = h('div', { class: 'pi' }), foot = h('div', { class: 'btnrow' });
+    var dlg = PJO.modal('นำเข้าแผนตรวจจากไฟล์', body, foot, { wide: true });
+    dlg.el.querySelector('.modal').classList.add('wide');
+    var file = h('input', { type: 'file', accept: '.xlsx,.pdf,application/pdf', id: 'pi-file' });
+    body.append(h('p', null, 'เลือกไฟล์แบบฟอร์ม ', h('b', { text: '"แผนงานของ … ประจำเดือน …"' }), ' เป็น Excel (.xlsx) หรือ PDF'),
+      h('div', { class: 'pi-drop' }, h('label', { for: 'pi-file', class: 'btn primary', text: 'เลือกไฟล์' }), file),
+      h('p', { class: 'muted', text: 'ทุกวันทำงานต้องมี ทีม, ชื่อพนักงาน และหมายเลขตำแหน่งงาน ครบ · เว้นวันเสาร์-อาทิตย์และวันหยุดโรงงานได้' }));
+    file.addEventListener('change', function () {
+      var f = file.files[0];
+      if (!f) return;
+      body.textContent = '';
+      body.append(h('div', { class: 'loading' }, h('div', { class: 'spinner' }), 'กำลังอ่าน ' + f.name + '…'));
+      PJO.readPlanFile(f).then(function (parsed) { review(f.name, parsed); }, function (e) {
+        body.textContent = '';
+        body.append(h('div', { class: 'notice err', text: e.message || String(e) }), h('div', { class: 'btnrow' }, h('button', { type: 'button', class: 'btn', onclick: function () { dlg.close(); PJO.planImport(opts); } }, 'เลือกไฟล์ใหม่')));
+      });
+    });
+
+    function review(fname, parsed) {
+      var wsCode = PJO.workshopFromText(parsed.title, lk.workshops);
+      if (!ws.some(function (w) { return w.code === wsCode; })) wsCode = opts.workshop || (ws[0] && ws[0].code) || '';
+      var state = { workshop: wsCode, month: parsed.month || PJO.today().slice(0, 7), days: {}, replace: true };
+      parsed.days.forEach(function (d) { state.days[d.day] = d; });
+      var wsSel = h('select', { id: 'pi-ws' }, ws.map(function (w) { return h('option', { value: w.code, selected: w.code === state.workshop }, w.name); }));
+      var mon = h('input', { type: 'month', id: 'pi-month', value: state.month });
+      var head = h('div', { class: 'grid' }, h('div', null, h('label', { for: 'pi-ws', text: 'Workshop' }), wsSel), h('div', null, h('label', { for: 'pi-month', text: 'เดือนของแผน' }), mon),
+        h('div', { class: 'wide muted' }, 'ไฟล์: ' + fname + ' (' + parsed.kind + (parsed.sheet ? ' · ' + parsed.sheet : '') + ')' + (parsed.month ? '' : ' · ไม่พบเดือนในไฟล์ กรุณาเลือกเดือน')));
+      var notes = h('div'), list = h('div', { class: 'pi-list' }), summary = h('div', { class: 'pi-sum' });
+      var replace = h('input', { type: 'checkbox', id: 'pi-replace', checked: true });
+      var replWrap = h('label', { class: 'pi-repl', style: 'display:none' }, replace, h('span', { id: 'pi-repl-text' }));
+      body.textContent = '';
+      body.append(head, notes, summary, replWrap, list);
+      if (parsed.garbled) notes.append(h('div', { class: 'notice err', text: 'PDF นี้เก็บตัวอักษรไทยแบบที่อ่านกลับได้ไม่สมบูรณ์ (ขึ้นกับฟอนต์ตอนสร้าง PDF) — ทีมและหมายเลขตำแหน่งงานใช้ได้ แต่ควรตรวจ/แก้ชื่อพนักงานด้านล่าง หรือใช้ไฟล์ Excel ต้นฉบับแทน' }));
+      var go = h('button', { type: 'button', class: 'btn primary', disabled: true }, 'นำเข้าแผน');
+      foot.textContent = '';
+      foot.append(h('button', { type: 'button', class: 'btn', onclick: dlg.close }, 'ปิด'), go);
+      var timer = null, last = null;
+      function payload(dry) {
+        var days = Object.keys(state.days).map(function (k) { return state.days[k]; });
+        return { workshop: wsSel.value, month: mon.value, days: days, replace: replace.checked, dry_run: dry, source: fname };
+      }
+      function check() {
+        go.disabled = true; summary.textContent = 'กำลังตรวจสอบ…';
+        PJO.call('plan_import', payload(true)).then(function (r) {
+          if (!r.ok) { summary.textContent = ''; summary.append(h('div', { class: 'notice err', text: r.data.message })); return; }
+          last = r.data; render(r.data);
+        }, function () { summary.textContent = 'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้'; });
+      }
+      function later() { clearTimeout(timer); timer = setTimeout(check, 700); }
+      wsSel.addEventListener('change', check); mon.addEventListener('change', check);
+      replace.addEventListener('change', function () { });
+      function render(r) {
+        summary.textContent = '';
+        summary.append(h('span', { class: 'pi-sumwrap' }, PJO.badge(r.errors ? 'b-cancelled' : 'b-completed', r.errors ? 'ข้อมูลไม่ครบ ' + r.errors + ' วัน' : 'ข้อมูลครบทุกวันทำงาน'),
+          ' ', PJO.badge('b-draft', 'วันทำงาน ' + r.working_days + ' วัน'), ' ', PJO.badge('b-draft', 'ลงแผนครบ ' + r.planned + ' วัน'),
+          r.warnings ? h('span', null, ' ', PJO.badge('b-amended', 'ควรตรวจ ' + r.warnings + ' วัน')) : null,
+          r.new_teams.length ? h('div', { class: 'muted', style: 'margin-top:6px', text: 'ทีมใหม่ที่จะสร้าง: ' + r.new_teams.join(', ') }) : null));
+        if (r.existing.total) {
+          replWrap.style.display = '';
+          document.getElementById('pi-repl-text').textContent = ' แทนที่แผนเดิมของเดือนนี้ (' + r.existing.total + ' รายการ' + (r.existing.with_audit ? ', ที่เริ่มตรวจแล้ว ' + r.existing.with_audit + ' รายการจะเก็บไว้' : '') + ')';
+        } else replWrap.style.display = 'none';
+        var focusId = document.activeElement && document.activeElement.id, caret = document.activeElement && document.activeElement.selectionStart;
+        list.textContent = '';
+        list.append(h('div', { class: 'pi-row pi-headrow' }, ['วันที่', 'ทีม', 'ชื่อพนักงาน', 'หมายเลขตำแหน่งงาน', 'ระดับ', 'ผลตรวจสอบ'].map(function (t) { return h('div', { text: t }); })));
+        r.days.forEach(function (d) {
+          var src = state.days[d.day] = state.days[d.day] || { day: d.day };
+          var off = d.weekend || d.holiday_name || src.holiday;
+          function field(key, ph, cls) {
+            var i = h('input', { id: 'pi-' + key + '-' + d.day, value: src[key] || '', placeholder: ph, class: cls || '', 'aria-label': ph + ' วันที่ ' + d.day });
+            i.addEventListener('input', function () { src[key] = i.value; later(); });
+            return i;
+          }
+          var hol = null;
+          if (!d.weekend && !d.holiday_name) {
+            var cb = h('input', { type: 'checkbox', id: 'pi-hol-' + d.day, checked: !!src.holiday });
+            cb.addEventListener('change', function () { src.holiday = cb.checked; check(); });
+            hol = h('label', { class: 'pi-hol' }, cb, ' วันหยุด');
+          }
+          list.append(h('div', { class: 'pi-row st-' + d.status + (off ? ' off' : '') },
+            h('div', { class: 'pi-date' }, h('b', { text: d.weekday + ' ' + d.day }), d.holiday_name ? h('small', { text: d.holiday_name }) : d.weekend ? h('small', { text: 'เสาร์-อาทิตย์' }) : null, hol),
+            field('team', 'ทีม'), field('name', 'ชื่อพนักงาน'), field('station', 'ตำแหน่งงาน'), field('level', 'A/B/C', 'pi-level'),
+            h('div', { class: 'pi-msg' }, d.messages.length ? d.messages.map(function (m) { return h('div', { class: 'm-' + m.type, text: m.text }); })
+              : h('div', { class: 'm-ok', text: d.status === 'ok' ? '✓ ครบ' : 'วันหยุด' }))));
+        });
+        if (focusId) { var el = document.getElementById(focusId); if (el) { el.focus(); try { el.setSelectionRange(caret, caret); } catch (e) { } } }
+        go.disabled = !!r.errors || !r.planned;
+        go.textContent = r.errors ? 'แก้ข้อมูลให้ครบก่อนนำเข้า' : 'นำเข้าแผน ' + r.planned + ' วัน';
+      }
+      go.addEventListener('click', function () {
+        go.disabled = true; go.textContent = 'กำลังนำเข้า…';
+        PJO.call('plan_import', payload(false)).then(function (r) {
+          if (!r.ok) { PJO.toast(r.data.message, true); if (r.data.result) render(r.data.result); else check(); return; }
+          dlg.close();
+          PJO.toast('นำเข้าแผน ' + r.data.created + ' รายการแล้ว' + (r.data.replaced ? ' (แทนที่ ' + r.data.replaced + ')' : ''));
+          if (opts.onDone) opts.onDone({ workshop: wsSel.value, month: mon.value });
+        }, function () { go.disabled = false; PJO.toast('เชื่อมต่อเซิร์ฟเวอร์ไม่ได้', true); });
+      });
+      check();
+    }
+  };
+})();
+</script>

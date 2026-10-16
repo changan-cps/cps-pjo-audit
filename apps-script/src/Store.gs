@@ -15,10 +15,11 @@ var TABLES = {
   Users: ['username', 'name', 'salt', 'pin_hash', 'roles', 'active', 'created_at', 'must_change_pin'],
   Templates: ['id', 'workshop', 'version', 'status', 'source_sha', 'change_note', 'created_at', 'published_at', 'retired_at', 'created_by'],
   Audits: ['id', 'audit_no', 'workshop', 'template_id', 'status', 'revision', 'audit_date', 'shift', 'team_id', 'station', 'model',
-           'employee_code', 'employee_name', 'auditor', 'plan_id', 'open_issues', 'recert_pending', 'missing_signatures', 'created_at', 'updated_at', 'completed_at'],
+           'employee_code', 'employee_name', 'auditor', 'plan_id', 'open_issues', 'recert_pending', 'missing_signatures', 'created_at', 'updated_at', 'completed_at', 'submitted_at'],
   Issues: ['id', 'issue_no', 'audit_id', 'workshop', 'team_id', 'station', 'sheet', 'item_code', 'issue_type', 'title', 'owner', 'owner_name',
            'due_date', 'status', 'occurrences', 'created_at', 'closed_at', 'audit_ids'],
-  Plans: ['id', 'workshop', 'team_id', 'station', 'employee_code', 'planned_date', 'auditor', 'note', 'cancelled', 'created_by', 'created_at'],
+  Plans: ['id', 'workshop', 'team_id', 'station', 'employee_code', 'planned_date', 'auditor', 'note', 'cancelled', 'created_by', 'created_at',
+          'team_name', 'employee_name', 'level', 'problems', 'batch_id', 'source', 'history', 'updated_at'],
   Pending: ['code', 'title', 'detail', 'workshops', 'sources', 'status', 'resolution', 'resolved_by', 'resolved_at'],
   Settings: ['key', 'value', 'updated_by', 'updated_at'],
   Counters: ['name', 'value'],
@@ -41,6 +42,16 @@ function sheet_(name) {
     db_._sheets[name] = sh;
   }
   return db_._sheets[name];
+}
+
+/** Rewrites the header row when a table gained columns since setup (data columns are positional). */
+function ensureHeader_(name) {
+  var sh = sheet_(name), cols = TABLES[name];
+  var cur = sh.getRange(1, 1, 1, cols.length).getValues()[0];
+  if (cur.join('|') !== cols.join('|')) {
+    sh.getRange(1, 1, Math.max(sh.getMaxRows(), 2), cols.length).setNumberFormat('@');
+    sh.getRange(1, 1, 1, cols.length).setValues([cols]).setFontWeight('bold');
+  }
 }
 
 function createTables_(ss) {

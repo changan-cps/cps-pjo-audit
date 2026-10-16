@@ -88,25 +88,34 @@ function issueRowOut_(i) {
 // ----------------------------------------------------------------- plans & audits list
 API.plans = function (u, p) {
   var vis = visibleWorkshops(u).filter(function (w) { return !p.workshop || w === p.workshop; });
-  var since = Utilities.formatDate(new Date(Date.now() - 31 * 864e5), 'Asia/Bangkok', 'yyyy-MM-dd');
+  var month = /^\d{4}-\d{2}$/.test(p.month || '') ? p.month : todayBkk().slice(0, 7);
   var audits = rows_('Audits').filter(function (a) { return vis.indexOf(a.workshop) >= 0; });
-  var plans = rows_('Plans').filter(function (x) { return vis.indexOf(x.workshop) >= 0 && x.cancelled !== 'true' && x.planned_date >= since; })
+  var byPlan = {}, win = auditWindow_(), today = todayBkk(), nowMin = minOfDay_(nowIso());
+  audits.forEach(function (a) { if (a.plan_id) (byPlan[a.plan_id] = byPlan[a.plan_id] || []).push(a); });
+  var plans = rows_('Plans').filter(function (x) { return vis.indexOf(x.workshop) >= 0 && x.cancelled !== 'true' && x.planned_date.slice(0, 7) === month; })
     .sort(function (a, b) { return a.planned_date < b.planned_date ? -1 : 1; })
-    .map(function (x) { var o = clean_(x); o.audits = audits.filter(function (a) { return a.plan_id === x.id; }).map(auditRowOut_); return o; });
+    .map(function (x) { return planOut_(x, byPlan, today, nowMin, win); });
   var list = audits.filter(function (a) {
     if (p.status && a.status !== p.status) return false;
     if (p.q) { var q = String(p.q).toLowerCase(); return (a.audit_no + ' ' + a.station + ' ' + a.employee_name).toLowerCase().indexOf(q) >= 0; }
     return true;
   }).sort(function (a, b) { return Number(b.id) - Number(a.id); }).slice(0, 300).map(auditRowOut_);
-  return { plans: plans, audits: list };
+  return { month: month, plans: plans, audits: list };
 };
 API.plan_save = function (u, p) {
   require_(hasRole(u, p.workshop, 'auditor', 'tlgl'));
+  if (p.cancel_id) return API.plan_cancel(u, { plan_id: p.cancel_id, reason: p.reason });
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(p.planned_date || '')) throw new RuleError('ระบุวันที่แผน');
+  var team = p.team_id ? find_('Teams', 'id', p.team_id) : null;
+  var emp = p.employee_code ? find_('Employees', 'code', p.employee_code) : null;
+  var teamName = String(p.team_name || (team ? team.name : '')).trim(), empName = String(p.employee_name || (emp ? emp.name : '')).trim();
+  if (!teamName || !empName || !String(p.station || '').trim()) throw new RuleError('ต้องมีทีม ชื่อพนักงาน และหมายเลขตำแหน่งงานครบ');
   return withLock(function () {
-    if (p.cancel_id) { var r = find_('Plans', 'id', p.cancel_id); require_(r && r.workshop === p.workshop); update_('Plans', r, { cancelled: 'true' }); return {}; }
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(p.planned_date || '')) throw new RuleError('ระบุวันที่แผน');
-    insert_('Plans', { id: String(nextNumber_('plan-id')), workshop: p.workshop, team_id: p.team_id || '', station: p.station || '', employee_code: p.employee_code || '',
-                       planned_date: p.planned_date, auditor: p.auditor || '', note: p.note || '', cancelled: 'false', created_by: u.username, created_at: nowIso() });
+    ensureHeader_('Plans');
+    insert_('Plans', { id: String(nextNumber_('plan-id')), workshop: p.workshop, team_id: p.team_id || teamIdFor_(p.workshop, teamName, false), station: String(p.station).trim(),
+                       employee_code: p.employee_code || matchEmployee_(p.workshop, empName), planned_date: p.planned_date, auditor: p.auditor || '', note: p.note || '',
+                       cancelled: 'false', created_by: u.username, created_at: nowIso(), team_name: teamName, employee_name: empName, level: String(p.level || '').toUpperCase(),
+                       problems: '', batch_id: '', source: 'manual', history: '', updated_at: '' });
     return {};
   });
 };
@@ -127,7 +136,10 @@ API.audit_open = function (u, p) {
     employee: { code: a.header.employee_code || '', name: a.header.employee_name || '' },
     pending_ws: pending.filter(function (x) { return x.workshops.split(',').map(function (s) { return s.trim(); }).indexOf(a.workshop) >= 0; }).map(clean_),
     pending_all: pending.filter(function (x) { return x.workshops === 'ALL'; }).map(clean_),
-    gbr: settingGet('gbr_mapping')
+    gbr: settingGet('gbr_mapping'),
+    timing: auditTiming_({ status: a.status, created_at: a.created_at, submitted_at: a.first_submitted_at || '' }), window: auditWindow_(),
+    plan: (function () { var pl = a.plan_id ? find_('Plans', 'id', a.plan_id) : null; return pl ? { id: pl.id, planned_date: pl.planned_date } : null; })(),
+    server_now: nowIso()
   };
 };
 function teamName_(id) { if (!id) return ''; var t = find_('Teams', 'id', id); return t ? t.workshop + ' / ' + (t.group ? t.group + ' / ' : '') + t.name : ''; }

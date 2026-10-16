@@ -190,6 +190,17 @@ function createSim(srcDir, opts) {
     },
     page() { freshExecution(); return ctx.doGet().getContent(); },
     advanceClock(ms) { clockOffset += ms; },
+    /** Pin the script's clock (Date / Date.now inside the project) to an ISO time; null restores real time. */
+    setNow(iso) {
+      vm.runInContext(`(function (target) {
+        var D = globalThis.__RealDate || (globalThis.__RealDate = Date);
+        if (target === null) { globalThis.Date = D; return; }
+        var off = target - D.now();
+        function P() { var a = Array.prototype.slice.call(arguments); return a.length ? new (Function.prototype.bind.apply(D, [null].concat(a)))() : new D(D.now() + off); }
+        P.now = function () { return D.now() + off; }; P.UTC = D.UTC; P.parse = D.parse; P.prototype = D.prototype;
+        globalThis.Date = P;
+      })(${iso === null ? 'null' : new Date(iso).getTime()})`, ctx);
+    },
   };
 }
 

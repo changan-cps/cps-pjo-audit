@@ -57,7 +57,8 @@ function saveAudit(a) {
     audit_date: a.header.audit_date, shift: a.header.shift, team_id: a.header.team_id || '', station: a.header.station, model: a.header.model,
     employee_code: a.header.employee_code || '', employee_name: a.header.employee_name, auditor: a.auditor, plan_id: a.plan_id || '',
     open_issues: openIssues, recert_pending: (a.followups || []).filter(function (f) { return f.stage !== 'recertified'; }).length,
-    missing_signatures: missing, created_at: a.created_at, updated_at: copy.updated_at, completed_at: a.completed_at || ''
+    missing_signatures: missing, created_at: a.created_at, updated_at: copy.updated_at, completed_at: a.completed_at || '',
+    submitted_at: a.first_submitted_at || ''
   };
   if (idx) update_('Audits', idx, rec); else insert_('Audits', rec);
 }
@@ -594,6 +595,7 @@ function submitAudit(user, auditId) {
     if (unlogged.length) throw new RuleError('ยังมีช่อง × ที่ไม่ได้บันทึกปัญหา: ' + unlogged.slice(0, 8).join(', '), 'unlogged', { items: unlogged });
     a.status = 'pending_signatures';
     a.submitted_at = nowIso();
+    if (!a.first_submitted_at) a.first_submitted_at = a.submitted_at;  // end of the audit for on-time / minutes checks
     trail(user, 'audit.submitted', a.id, '', {});
     refreshCompletion_(a, user);
     saveAudit(a);
