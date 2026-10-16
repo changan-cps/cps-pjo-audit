@@ -1,5 +1,5 @@
 // Caches only the launcher shell so the icon opens even without signal; the PJO system itself always loads live from Google.
-var CACHE = 'pjo-launcher-v1';
+var CACHE = 'pjo-launcher-v2';
 var SHELL = ['./', './index.html', './config.js', './manifest.webmanifest', './icons/icon-192.png', './icons/apple-touch-icon.png'];
 self.addEventListener('install', function (e) { e.waitUntil(caches.open(CACHE).then(function (c) { return c.addAll(SHELL); })); self.skipWaiting(); });
 self.addEventListener('activate', function (e) {
