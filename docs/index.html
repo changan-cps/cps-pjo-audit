@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>PJO Audit</title>
+<meta name="theme-color" content="#0a2e6e">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="PJO Audit">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="64x64" href="icons/favicon-64.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<style>
+  html, body { margin: 0; height: 100%; background: #0a2e6e; overflow: hidden; }
+  body { font-family: Sarabun, "Noto Sans Thai", Tahoma, sans-serif; color: #fff; }
+  #wrap { position: fixed; inset: 0; padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); background: #fff; }
+  #app { width: 100%; height: 100%; border: 0; display: block; background: #fff; }
+  #splash { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px;
+            background: linear-gradient(135deg, #1565c0, #0a2e6e); text-align: center; padding: 24px; transition: opacity .35s; z-index: 2; }
+  #splash img { width: 112px; height: 112px; border-radius: 24px; box-shadow: 0 8px 28px rgba(0,0,0,.3); }
+  #splash h1 { margin: 0; font-size: 26px; font-weight: 700; }
+  #msg { font-size: 18px; line-height: 1.5; max-width: 420px; }
+  .spin { width: 34px; height: 34px; border: 4px solid rgba(255,255,255,.3); border-top-color: #ffc107; border-radius: 50%; animation: s 0.9s linear infinite; }
+  @keyframes s { to { transform: rotate(360deg); } }
+  .btns { display: none; gap: 12px; flex-wrap: wrap; justify-content: center; }
+  .btns a, .btns button { font: inherit; font-size: 18px; padding: 12px 20px; border-radius: 12px; border: 0; cursor: pointer; text-decoration: none; }
+  .primary { background: #ffc107; color: #0a2e6e; font-weight: 700; }
+  .ghost { background: rgba(255,255,255,.15); color: #fff; }
+  .hide { opacity: 0; pointer-events: none; }
+</style>
+</head>
+<body>
+<div id="wrap"></div>
+<div id="splash">
+  <img src="icons/apple-touch-icon.png" alt="">
+  <h1>CPS PJO Audit</h1>
+  <div class="spin" id="spin"></div>
+  <div id="msg">กำลังเปิดระบบ…</div>
+  <div class="btns" id="btns">
+    <button class="primary" id="retry">ลองใหม่</button>
+    <a class="ghost" id="direct" target="_blank" rel="noopener">เปิดในเบราว์เซอร์</a>
+  </div>
+</div>
+<script src="config.js"></script>
+<script>
+(function () {
+  var url = (window.PJO_EXEC_URL || '').trim();
+  var splash = document.getElementById('splash'), msg = document.getElementById('msg'),
+      btns = document.getElementById('btns'), spin = document.getElementById('spin');
+  function problem(text) { spin.style.display = 'none'; msg.textContent = text; btns.style.display = 'flex'; splash.classList.remove('hide'); }
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(function () {});
+  if (!/^https?:\/\//.test(url)) {
+    problem('ยังไม่ได้ตั้งค่าลิงก์ระบบ — ผู้ดูแลระบบใส่ Web app URL ในไฟล์ config.js');
+    btns.style.display = 'none'; return;
+  }
+  document.getElementById('direct').href = url;
+  document.getElementById('retry').onclick = function () { location.reload(); };
+  if (window.PJO_MODE === 'open') { location.replace(url); return; }
+  if (!navigator.onLine) { problem('ไม่มีสัญญาณอินเทอร์เน็ต เชื่อมต่อแล้วกด "ลองใหม่"'); return; }
+  var f = document.createElement('iframe');
+  f.id = 'app'; f.title = 'CPS PJO Audit'; f.src = url;
+  f.allow = 'camera; clipboard-write; fullscreen';
+  var loaded = false;
+  f.onload = function () { loaded = true; splash.classList.add('hide'); };
+  document.getElementById('wrap').appendChild(f);
+  setTimeout(function () { if (!loaded) problem('เปิดช้ากว่าปกติ ลองกด "ลองใหม่" หรือเปิดในเบราว์เซอร์'); }, 25000);
+  window.addEventListener('offline', function () { if (!loaded) problem('สัญญาณหลุด เชื่อมต่อแล้วกด "ลองใหม่"'); });
+})();
+</script>
+</body>
+</html>

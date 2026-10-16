@@ -32,8 +32,23 @@ var PJO = window.PJO || {};
     return PJO.call(name, payload).then(function (r) {
       if (!r.ok) { PJO.toast(r.data.message || 'ทำรายการไม่สำเร็จ', true); throw r; }
       return r.data;
-    }, function (e) { PJO.toast('เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ (ออฟไลน์?)', true); throw e; });
+    }, function (e) { PJO.toast('เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ (ออฟไลน์?)', true); if (e && typeof e === 'object') e._shown = true; throw e; });
   };
+
+  // A page whose data failed to load (already toasted by PJO.get) shows a message instead of spinning forever.
+  window.addEventListener('unhandledrejection', function (ev) {
+    var r = ev.reason;
+    if (!r || !(r.ok === false || r._shown)) return;
+    ev.preventDefault();
+    var main = document.getElementById('main'), ld = main && main.querySelector(':scope > .loading');
+    if (!ld) return;
+    var text = (r.data && r.data.message) || 'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ ตรวจสอบสัญญาณแล้วลองใหม่';
+    main.textContent = '';
+    main.append(PJO.h('div', { class: 'notice', style: 'margin:16px;font-size:17px' }, PJO.h('b', { text: text }),
+      PJO.h('div', { class: 'btnrow', style: 'margin-top:12px' },
+        PJO.h('button', { type: 'button', class: 'btn primary', onclick: function () { PJO.route(); } }, 'ลองใหม่'),
+        PJO.h('a', { class: 'btn', href: '#/' }, 'กลับหน้าหลัก'))));
+  });
 
   PJO.h = function (tag, attrs) {
     var el = document.createElement(tag);

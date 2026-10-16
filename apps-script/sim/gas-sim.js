@@ -166,7 +166,7 @@ function createSim(srcDir, opts) {
       return {
         evaluate() {
           const html = htmlFiles[name].replace(/<\?!=\s*include\('([^']+)'\)\s*\?>/g, (_, n) => htmlFiles[n]);
-          const out = { content: html, getContent: () => html, setTitle: () => out, addMetaTag: () => out, setXFrameOptionsMode: () => out };
+          const out = { content: html, getContent: () => html, setTitle: () => out, addMetaTag: () => out, setXFrameOptionsMode: () => out, setFaviconUrl: (u) => { if (!/^https:\/\//.test(u)) throw new Error('bad favicon'); return out; } };
           return out;
         },
       };

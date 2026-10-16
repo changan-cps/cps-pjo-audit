@@ -1489,11 +1489,19 @@ API.admin_employee_link = function (u, p) {
  */
 var APP_NAME = 'CPS PJO Audit';
 
+// Icon shown in the browser tab / Android shortcut. Hosted with the launcher on GitHub Pages (docs/).
+var ICON_URL = 'https://changan-cps.github.io/cps-pjo-audit/icons/icon-192.png';
+
 function doGet() {
-  return HtmlService.createTemplateFromFile('Index').evaluate()
+  var out = HtmlService.createTemplateFromFile('Index').evaluate()
     .setTitle(APP_NAME)
     .addMetaTag('viewport', 'width=device-width, initial-scale=1, viewport-fit=cover')
-    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DEFAULT);
+    .addMetaTag('mobile-web-app-capable', 'yes')
+    // ALLOWALL lets the home-screen launcher (docs/index.html) show the app full screen.
+    // Access is still controlled by the app's own username + PIN login.
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  try { out.setFaviconUrl(ICON_URL); } catch (e) { /* invalid URL: keep default icon */ }
+  return out;
 }
 
 function include(name) { return HtmlService.createHtmlOutputFromFile(name).getContent(); }
