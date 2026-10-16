@@ -29,24 +29,57 @@ function cpsExportSetup() {
 }
 function cpsExportResetKey() { PropertiesService.getScriptProperties().deleteProperty(CPS_KEY_PROP); return cpsExportSetup(); }
 
-/** Any call that carries an export key (or asks for an export) is a CPS call; the app itself is opened with no parameters. */
-function isCpsRequest_(e) { var p = (e && e.parameter) || {}; return !!(p.cps || p.export_key || p.key || /export|sync|cps/i.test(p.action || '')); }
+/** The app page itself is opened with no parameters; any call with parameters (or a POST) is a CPS/API call. */
+function isCpsRequest_(e) { var p = (e && e.parameter) || {}; return Object.keys(p).length > 0; }
+
+function doPost(e) {
+  var p = {};
+  Object.keys((e && e.parameter) || {}).forEach(function (k) { p[k] = e.parameter[k]; });
+  try { var body = e && e.postData && e.postData.contents ? JSON.parse(e.postData.contents) : {}; Object.keys(body || {}).forEach(function (k) { if (p[k] === undefined) p[k] = body[k]; }); } catch (err) { /* form body: already in e.parameter */ }
+  return cpsExport_(p, 'POST');
+}
+
+/** Keeps the last 10 calls (parameter names only, never the key) so a mismatch with the CPS reader can be seen. */
+function cpsLogRequest_(params, method, result) {
+  try {
+    var log = settingGet('cps_requests') || [];
+    log.push({ at: nowIso(), method: method || 'GET', params: Object.keys(params || {}).filter(function (k) { return !/key|token|secret/i.test(k); })
+      .map(function (k) { return k + '=' + String(params[k]).slice(0, 40); }).concat(Object.keys(params || {}).filter(function (k) { return /key|token|secret/i.test(k); }).map(function (k) { return k + '=***'; })),
+      result: result });
+    settingPut('cps_requests', log.slice(-10), 'cps');
+  } catch (e) { /* logging must never break the export */ }
+}
+/** Run in the editor: shows how CPS called this app recently. */
+function cpsLastRequests() { var r = settingGet('cps_requests') || []; Logger.log(JSON.stringify(r, null, 1)); return r; }
 
 function cpsJson_(obj) { return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON); }
 
-function cpsExport_(params) {
+function cpsExport_(params, method) {
+  var res = cpsExportInner_(params);
+  cpsLogRequest_(params, method, res.ok ? 'ok' : res.code);
+  return cpsJson_(res);
+}
+var CPS_PING = /^(ping|test|health|check|status|info|meta|version|hello)$/i;
+function cpsExportInner_(params) {
   var key = PropertiesService.getScriptProperties().getProperty(CPS_KEY_PROP);
-  var given = String(params.key || params.export_key || '');
-  if (!key) return cpsJson_({ ok: false, code: 'not_setup', message: 'ยังไม่ได้สร้าง Export key — รันฟังก์ชัน cpsExportSetup ใน Apps Script' });
+  var given = String(params.key || params.export_key || params.exportKey || params.api_key || params.apikey || params.token || '');
+  var action = String(params.action || params.mode || params.fn || params.op || params.cmd || '');
+  var service = { service: 'cps-pjo-audit', schema: 'cps-pjo-export/1', app: APP_NAME, server_time: nowIso() };
+  if (!key) return Object.assign({ ok: false, code: 'not_setup', message: 'ยังไม่ได้สร้าง Export key — รันฟังก์ชัน cpsExportSetup ใน Apps Script' }, service);
+  if (!given) return Object.assign({ ok: false, code: 'key_required', message: 'ต้องส่ง Export key (พารามิเตอร์ key)' }, service);
   if (given.length !== key.length || Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, given).join() !== Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, key).join())
-    return cpsJson_({ ok: false, code: 'forbidden', message: 'Export key ไม่ถูกต้อง' });
+    return Object.assign({ ok: false, code: 'forbidden', message: 'Export key ไม่ถูกต้อง' }, service);
+  if (CPS_PING.test(action)) {
+    return Object.assign({ ok: true, message: 'เชื่อมต่อ PJO Audit สำเร็จ',
+      counts: { audits: rows_('Audits').length, issues: rows_('Issues').length, plans: rows_('Plans').length } }, service);
+  }
   try {
     var data = cpsExportData_(params);
     cpsRecordPull_(data.generated_at, params.ack);
     try { data.retention = runRetention_(false); } catch (err) { data.retention = { error: String(err && err.message || err) }; }
-    return cpsJson_(data);
+    return Object.assign(data, { service: service.service, app: APP_NAME });
   } catch (err) {
-    return cpsJson_({ ok: false, code: 'error', message: String(err && err.message || err) });
+    return Object.assign({ ok: false, code: 'error', message: String(err && err.message || err) }, service);
   }
 }
 

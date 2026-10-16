@@ -207,6 +207,12 @@ test('CPS export: key required, full standard-form data, since/ack, then retenti
   assert.equal(env.sim.get({ cps: 'export', key: 'x' }).body.code, 'not_setup');
   const key = /\n([0-9a-f]{40})\n/.exec(env.sim.call('cpsExportSetup'))[1];
   assert.equal(env.sim.get({ cps: 'export', key: 'wrong' }).body.code, 'forbidden');
+  assert.equal(env.sim.get({ action: 'anything' }).body.code, 'key_required');     // any call with parameters answers JSON
+  const ping = env.sim.get({ action: 'test', key }).body;
+  assert.equal(ping.ok, true); assert.equal(ping.service, 'cps-pjo-audit'); assert.equal(ping.counts.audits, 1);
+  const log = env.sim.call('cpsLastRequests');
+  assert.ok(log.some(r => r.params.includes('key=***') && r.result === 'ok'));
+  assert.ok(!JSON.stringify(log).includes(key), 'key never logged');
   const r1 = env.sim.get({ cps: 'export', key });
   assert.equal(r1.mime, 'application/json');
   const d = r1.body;
