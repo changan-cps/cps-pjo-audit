@@ -20,7 +20,7 @@ var TABLES = {
   Issues: ['id', 'issue_no', 'audit_id', 'workshop', 'team_id', 'station', 'sheet', 'item_code', 'issue_type', 'title', 'owner', 'owner_name',
            'due_date', 'status', 'occurrences', 'created_at', 'closed_at', 'audit_ids'],
   Plans: ['id', 'workshop', 'team_id', 'station', 'employee_code', 'planned_date', 'auditor', 'note', 'cancelled', 'created_by', 'created_at',
-          'team_name', 'employee_name', 'level', 'problems', 'batch_id', 'source', 'history', 'updated_at'],
+          'team_name', 'employee_name', 'level', 'problems', 'batch_id', 'source', 'history', 'updated_at', 'snapshot'],
   Pending: ['code', 'title', 'detail', 'workshops', 'sources', 'status', 'resolution', 'resolved_by', 'resolved_at'],
   Settings: ['key', 'value', 'updated_by', 'updated_at'],
   Counters: ['name', 'value'],
@@ -1563,6 +1563,12 @@ function auditTiming_(a, win) {
 function planStatus_(plan, audits, today, nowMin, win) {
   var live = audits.filter(function (a) { return a.status !== 'cancelled'; })
     .sort(function (a, b) { return Number(b.id) - Number(a.id); });
+  if (!live.length && plan.snapshot) {
+    // the audit itself was cleared after CPS received it (Retention.gs) – keep showing its result
+    var snap = JSON.parse(plan.snapshot);
+    return { code: snap.code, label: PLAN_STATUS[snap.code].label, color: PLAN_STATUS[snap.code].color, timing: snap.timing, why: snap.why || [],
+             audits: (snap.audits || []).map(function (x) { return Object.assign({}, x, { archived: true }); }), archived_at: snap.at };
+  }
   var a = live[0], code, timing = a ? auditTiming_(a, win) : null;
   var afterWindow = plan.planned_date < today || (plan.planned_date === today && nowMin > toMin_(win.end) + win.grace);
   if (!a) code = afterWindow ? 'missed' : plan.planned_date === today ? 'today' : 'planned';
@@ -1581,7 +1587,7 @@ function planStatus_(plan, audits, today, nowMin, win) {
 
 function planOut_(pl, auditsByPlan, today, nowMin, win) {
   var o = clean_(pl);
-  delete o.history;
+  delete o.history; delete o.snapshot;
   o.history_count = pl.history ? JSON.parse(pl.history).length : 0;
   o.state = planStatus_(pl, auditsByPlan[pl.id] || [], today, nowMin, win);
   return o;
@@ -1625,7 +1631,8 @@ API.plan_update = function (u, p) {
     require_(canCreateAudit(u, pl.workshop));
     var reason = String(p.reason || '').trim();
     if (!reason) throw new RuleError('ระบุเหตุผลการเปลี่ยนแผน เช่น พนักงานลา');
-    var done = rows_('Audits').some(function (a) { return a.plan_id === pl.id && a.status !== 'cancelled' && a.submitted_at; });
+    var done = rows_('Audits').some(function (a) { return a.plan_id === pl.id && a.status !== 'cancelled' && a.submitted_at; }) ||
+      (pl.snapshot && (JSON.parse(pl.snapshot).audits || []).some(function (a) { return a.timing && a.timing.finished_at; }));
     if (done) throw new RuleError('แผนนี้ตรวจและส่งลงนามแล้ว เปลี่ยนแผนไม่ได้');
     if (p.planned_date !== undefined && !/^\d{4}-\d{2}-\d{2}$/.test(p.planned_date)) throw new RuleError('วันที่ไม่ถูกต้อง');
     var ch = {}, from = {}, to = {};
@@ -1815,6 +1822,199 @@ API.plan_import = function (u, p) {
   });
 };
 
+// ===== Retention.gs =====
+/**
+ * Data retention: the CPS System keeps the history (it pulls this app every 720 minutes), so this app only keeps
+ * the last 2 days. Everything older than 2 days that CPS has already received is removed:
+ * audits, issues, their photos/signature files (moved to Drive trash) and the change log.
+ * Plans (แผนตรวจ) are never removed; before an audit is removed, the plan keeps a snapshot of its calendar status.
+ */
+var RETENTION_DAYS = 2;
+
+/** Called by the CPS export each time CPS pulls data. ack = generated_at of the last export CPS stored (optional). */
+function cpsRecordPull_(generatedAt, ack) {
+  var s = settingGet('cps_sync') || { pulls: [] };
+  s.pulls = (s.pulls || []).concat([generatedAt]).slice(-10);
+  if (ack && /^\d{4}-\d{2}-\d{2}T/.test(ack) && (!s.ack || ack > s.ack)) s.ack = ack;
+  settingPut('cps_sync', s, 'cps');
+  return s;
+}
+/** Records changed before this time have certainly been delivered to CPS. */
+function cpsDeliveredUntil_() {
+  var s = settingGet('cps_sync');
+  if (!s) return '';
+  if (s.ack) return s.ack;
+  var p = s.pulls || [];
+  return p.length >= 2 ? p[p.length - 2] : '';  // the previous pull answered, and CPS came back for more
+}
+
+function deleteRowsWhere_(name, drop) {
+  var sh = sheet_(name), cols = TABLES[name], all = rows_(name);
+  var keep = all.filter(function (r) { return !drop(r); });
+  if (keep.length === all.length) return 0;
+  var n = sh.getLastRow() - 1;
+  if (n > 0) sh.getRange(2, 1, n, cols.length).clearContent();
+  if (keep.length) sh.getRange(2, 1, keep.length, cols.length).setValues(keep.map(function (r) { return cols.map(function (c) { return cell_(r[c]); }); }));
+  invalidate_(name);
+  return all.length - keep.length;
+}
+function trashFile_(id) { if (!id) return 0; try { DriveApp.getFileById(id).setTrashed(true); return 1; } catch (e) { return 0; } }
+
+/**
+ * Removes data older than RETENTION_DAYS that CPS already has. Runs at most once a day (after a CPS pull);
+ * pass force=true to run now. Returns what was removed.
+ */
+function runRetention_(force) {
+  var state = settingGet('retention') || {};
+  if (!force && state.last_run && Date.now() - new Date(state.last_run).getTime() < 20 * 3600e3) return { skipped: 'ran recently', last: state.last_run };
+  var delivered = cpsDeliveredUntil_();
+  if (!delivered) return { skipped: 'CPS ยังไม่เคยดึงข้อมูล จึงยังไม่ล้าง' };
+  var cutoff = new Date(Date.now() - RETENTION_DAYS * 864e5).toISOString();
+  var limit = delivered < cutoff ? delivered : cutoff;
+  return withLock(function () {
+    var old = function (iso) { return iso && iso < limit; };
+    var audits = rows_('Audits').filter(function (a) { return old(a.updated_at || a.created_at); });
+    var issues = rows_('Issues').filter(function (i) {
+      var b = null; try { b = blobGet('issue:' + i.id); } catch (e) { b = null; }
+      return old((b && b.updated_at) || i.closed_at || i.created_at);
+    });
+    var res = { limit: limit, audits: audits.length, issues: issues.length, files: 0, trail: 0, plans_snapshot: 0 };
+    if (!audits.length && !issues.length) {
+      res.trail = deleteRowsWhere_('Trail', function (t) { return old(t.at); });
+      settingPut('retention', { last_run: nowIso(), last: res }, 'system');
+      return res;
+    }
+    // 1) plans keep their calendar status
+    var gone = {}; audits.forEach(function (a) { gone[a.id] = true; });
+    var win = auditWindow_(), today = todayBkk(), nowMin = minOfDay_(nowIso());
+    var byPlan = {};
+    rows_('Audits').forEach(function (a) { if (a.plan_id) (byPlan[a.plan_id] = byPlan[a.plan_id] || []).push(a); });
+    ensureHeader_('Plans');
+    rows_('Plans').filter(function (pl) { return (byPlan[pl.id] || []).some(function (a) { return gone[a.id]; }); }).forEach(function (pl) {
+      var st = planStatus_(pl, byPlan[pl.id], today, nowMin, win);
+      update_('Plans', pl, { snapshot: JSON.stringify({ at: nowIso(), code: st.code, why: st.why, timing: st.timing, audits: st.audits }) });
+      res.plans_snapshot++;
+    });
+    // 2) files on Drive (to trash, recoverable for 30 days)
+    audits.forEach(function (a) {
+      var doc = null; try { doc = blobGet('audit:' + a.id); } catch (e) { doc = null; }
+      if (!doc) return;
+      (doc.signatures || []).forEach(function (s) { res.files += trashFile_(s.file_id); });
+      (doc.attachments || []).forEach(function (f) { res.files += trashFile_(f.id || f.file_id); });
+    });
+    issues.forEach(function (i) {
+      var doc = null; try { doc = blobGet('issue:' + i.id); } catch (e) { doc = null; }
+      if (doc) (doc.attachments || []).forEach(function (f) { res.files += trashFile_(f.id || f.file_id); });
+    });
+    // 3) rows
+    var keys = {};
+    audits.forEach(function (a) { keys['audit:' + a.id] = true; });
+    issues.forEach(function (i) { keys['issue:' + i.id] = true; });
+    var dropIssue = {}; issues.forEach(function (i) { dropIssue[i.id] = true; });
+    deleteRowsWhere_('Audits', function (a) { return gone[a.id]; });
+    deleteRowsWhere_('Issues', function (i) { return dropIssue[i.id]; });
+    deleteRowsWhere_('Blobs', function (b) { return keys[b.key]; });
+    res.trail = deleteRowsWhere_('Trail', function (t) { return old(t.at); });
+    var cache = CacheService.getScriptCache();
+    Object.keys(keys).forEach(function (k) { try { cache.remove('b:' + k); } catch (e) { /* ignore */ } });
+    settingPut('retention', { last_run: nowIso(), last: res }, 'system');
+    trail(null, 'retention.run', '', '', res);
+    return res;
+  });
+}
+
+/** Run from the Apps Script editor to clear old data right away (still only what CPS already has). */
+function purgeOldDataNow() { var r = runRetention_(true); Logger.log(JSON.stringify(r)); return r; }
+
+// ===== CpsExport.gs =====
+/**
+ * Read-only export for the CPS System (PJO Record / PJO Issue pages pull this every 720 minutes).
+ *
+ *   GET <web app /exec URL>?cps=export&key=<export key>[&since=<ISO>][&ack=<ISO>][&images=0]
+ *
+ * key    – from cpsExportSetup() (run once in the Apps Script editor; it prints the key)
+ * since  – only audits / issues changed after this time (send the generated_at of the last export you stored)
+ * ack    – generated_at of the last export CPS stored successfully; lets this app clear its copy after 2 days
+ * images – 0 = leave out signature / photo images (default: included, because this app keeps only 2 days)
+ *
+ * Response (JSON, schema "cps-pjo-export/1"):
+ *   { ok, schema, generated_at, since, window, holidays, plans[], audits[], issues[], retention }
+ *   audits[i] = { index, audit, snapshot (full standard form of that template version), issues, signatures (with image),
+ *                 all_signatures, timing, team, status_th, plan, audit_time }
+ * The CPS page can rebuild the standard 4-sheet form (ตารางสังเกตการณ์ 1–4) from snapshot (s1–s4 = the template items with
+ * their source cells in the CATH-CPS009-B02 Excel) + audit (marks, s2 rows, s3 answers, s4 events, header, signatures).
+ */
+var CPS_KEY_PROP = 'CPS_EXPORT_KEY';
+var CPS_USER = { username: 'cps-export', name: 'CPS System', roles: [{ role: 'admin', workshop: 'ALL' }] };
+
+function cpsExportSetup() {
+  var props = PropertiesService.getScriptProperties();
+  var key = props.getProperty(CPS_KEY_PROP);
+  if (!key) { key = Utilities.getUuid().replace(/-/g, '') + Utilities.getUuid().replace(/-/g, '').slice(0, 8); props.setProperty(CPS_KEY_PROP, key); }
+  var msg = 'Export key สำหรับระบบ CPS:\n' + key + '\n\nนำไปวางในช่อง "Export key" ที่หน้า PJO › ตั้งค่าการเชื่อมต่อ ในระบบ CPS\n' +
+            'ถ้าต้องการเปลี่ยน key ให้รันฟังก์ชัน cpsExportResetKey';
+  Logger.log(msg);
+  return msg;
+}
+function cpsExportResetKey() { PropertiesService.getScriptProperties().deleteProperty(CPS_KEY_PROP); return cpsExportSetup(); }
+
+/** Any call that carries an export key (or asks for an export) is a CPS call; the app itself is opened with no parameters. */
+function isCpsRequest_(e) { var p = (e && e.parameter) || {}; return !!(p.cps || p.export_key || p.key || /export|sync|cps/i.test(p.action || '')); }
+
+function cpsJson_(obj) { return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON); }
+
+function cpsExport_(params) {
+  var key = PropertiesService.getScriptProperties().getProperty(CPS_KEY_PROP);
+  var given = String(params.key || params.export_key || '');
+  if (!key) return cpsJson_({ ok: false, code: 'not_setup', message: 'ยังไม่ได้สร้าง Export key — รันฟังก์ชัน cpsExportSetup ใน Apps Script' });
+  if (given.length !== key.length || Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, given).join() !== Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, key).join())
+    return cpsJson_({ ok: false, code: 'forbidden', message: 'Export key ไม่ถูกต้อง' });
+  try {
+    var data = cpsExportData_(params);
+    cpsRecordPull_(data.generated_at, params.ack);
+    try { data.retention = runRetention_(false); } catch (err) { data.retention = { error: String(err && err.message || err) }; }
+    return cpsJson_(data);
+  } catch (err) {
+    return cpsJson_({ ok: false, code: 'error', message: String(err && err.message || err) });
+  }
+}
+
+function cpsExportData_(params) {
+  var since = /^\d{4}-\d{2}-\d{2}T/.test(params.since || '') ? params.since : '';
+  var images = params.images !== '0';
+  var generated = nowIso(), win = auditWindow_(), today = todayBkk(), nowMin = minOfDay_(generated);
+  var auditRows = rows_('Audits');
+  var byPlan = {};
+  auditRows.forEach(function (a) { if (a.plan_id) (byPlan[a.plan_id] = byPlan[a.plan_id] || []).push(a); });
+  var plans = rows_('Plans').map(function (pl) {
+    var o = planOut_(pl, byPlan, today, nowMin, win);
+    o.history = pl.history ? JSON.parse(pl.history) : [];
+    return o;
+  });
+  var audits = auditRows.filter(function (a) { return !since || (a.updated_at || a.created_at) > since; }).map(function (row) {
+    var x = API.audit_export(CPS_USER, { audit_id: row.id, with_images: images });
+    x.index = clean_(row);
+    x.audit_time = auditTiming_(row, win);
+    var pl = row.plan_id ? find_('Plans', 'id', row.plan_id) : null;
+    x.plan = pl ? { id: pl.id, planned_date: pl.planned_date, station: pl.station, employee_name: pl.employee_name, team_name: pl.team_name, level: pl.level } : null;
+    return x;
+  });
+  var issues = rows_('Issues').map(function (row) {
+    var i = loadIssue(row.id);
+    if (since && (i.updated_at || i.created_at) <= since) return null;
+    var o = issueRowOut_(row);
+    o.detail = JSON.parse(JSON.stringify(i));
+    if (images) o.detail.attachments = (i.attachments || []).map(function (f) {
+      var c = Object.assign({}, f);
+      try { c.data_url = readFileDataUrl_(f.id); } catch (e) { c.data_url = null; }
+      return c;
+    });
+    return o;
+  }).filter(Boolean);
+  return { ok: true, schema: 'cps-pjo-export/1', generated_at: generated, since: since, window: win, holidays: holidays_(),
+           workshops: rows_('Workshops').map(clean_), teams: rows_('Teams').map(clean_), plans: plans, audits: audits, issues: issues };
+}
+
 // ===== Code.gs =====
 /**
  * CPS PJO Audit – Google Apps Script web app.
@@ -1826,7 +2026,8 @@ var APP_NAME = 'CPS PJO Audit';
 // Icon shown in the browser tab / Android shortcut. Hosted with the launcher on GitHub Pages (docs/).
 var ICON_URL = 'https://changan-cps.github.io/cps-pjo-audit/icons/icon-192.png';
 
-function doGet() {
+function doGet(e) {
+  if (isCpsRequest_(e)) return cpsExport_(e.parameter);  // CPS System pull (CpsExport.gs)
   var out = HtmlService.createTemplateFromFile('Index').evaluate()
     .setTitle(APP_NAME)
     .addMetaTag('viewport', 'width=device-width, initial-scale=1, viewport-fit=cover')

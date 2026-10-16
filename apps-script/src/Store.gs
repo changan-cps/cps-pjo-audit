@@ -19,7 +19,7 @@ var TABLES = {
   Issues: ['id', 'issue_no', 'audit_id', 'workshop', 'team_id', 'station', 'sheet', 'item_code', 'issue_type', 'title', 'owner', 'owner_name',
            'due_date', 'status', 'occurrences', 'created_at', 'closed_at', 'audit_ids'],
   Plans: ['id', 'workshop', 'team_id', 'station', 'employee_code', 'planned_date', 'auditor', 'note', 'cancelled', 'created_by', 'created_at',
-          'team_name', 'employee_name', 'level', 'problems', 'batch_id', 'source', 'history', 'updated_at'],
+          'team_name', 'employee_name', 'level', 'problems', 'batch_id', 'source', 'history', 'updated_at', 'snapshot'],
   Pending: ['code', 'title', 'detail', 'workshops', 'sources', 'status', 'resolution', 'resolved_by', 'resolved_at'],
   Settings: ['key', 'value', 'updated_by', 'updated_at'],
   Counters: ['name', 'value'],

@@ -32,7 +32,7 @@
   function wsFilter(current, onchange) {
     return h('div', { class: 'filters' }, sel('wsf', 'Workshop', [['', 'ทุก Workshop ที่มีสิทธิ์']].concat(S.workshops.map(function (w) { return [w.code, w.name]; })), current, onchange));
   }
-  function auditLink(a) { return h('a', { href: '#/audit/' + a.id, text: a.audit_no }); }
+  function auditLink(a) { return a.archived ? h('span', { title: 'ข้อมูลเกิน 2 วัน ย้ายไปเก็บในระบบ CPS แล้ว' }, h('b', { text: a.audit_no }), h('small', { class: 'muted', text: ' (เก็บใน CPS)' })) : h('a', { href: '#/audit/' + a.id, text: a.audit_no }); }
   function issueLink(i) { return h('a', { href: '#/issue/' + i.id, text: i.issue_no }); }
   function gbrBadge(g) { return PJO.badge('gbr-' + g, g, S.gbr ? S.gbr[g] : ''); }
   function lookups() { return S.lookups ? Promise.resolve(S.lookups) : PJO.get('lookups').then(function (d) { S.lookups = d; return d; }); }

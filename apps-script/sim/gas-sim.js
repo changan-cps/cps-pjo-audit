@@ -19,6 +19,7 @@ class Range {
   getRow() { return this.r; }
   setNumberFormat() { return this; }
   setFontWeight() { return this; }
+  clearContent() { for (let i = 0; i < this.nr; i++) { const row = this.sheet.data[this.r - 1 + i]; if (row) for (let j = 0; j < this.nc; j++) row[this.c - 1 + j] = ''; } return this; }
   getValues() {
     const out = [];
     for (let i = 0; i < this.nr; i++) {
@@ -136,6 +137,10 @@ function createSim(srcDir, opts) {
           .replace('HH', parts.hour).replace('mm', parts.minute).replace('ss', parts.second);
       },
     },
+    ContentService: {
+      MimeType: { JSON: 'application/json' },
+      createTextOutput(text) { const o = { text, mime: 'text/plain', getContent: () => text, setMimeType(m) { o.mime = m; return o; } }; return o; },
+    },
     DriveApp: {
       createFolder(name) { const id = 'fd' + crypto.randomBytes(4).toString('hex'); store.folders[id] = name; return { getId: () => id }; },
       getFolderById(id) {
@@ -144,7 +149,7 @@ function createSim(srcDir, opts) {
       getFileById(id) {
         const b = store.files[id];
         if (!b) throw new Error('no file');
-        return { getBlob: () => ({ getContentType: () => b.mime, getBytes: () => b.bytes }) };
+        return { getBlob: () => ({ getContentType: () => b.mime, getBytes: () => b.bytes }), setTrashed: (t) => { b.trashed = !!t; } };
       },
     },
     Logger: { log: (...a) => { if (opts.verbose) console.log(...a); } },
@@ -189,6 +194,8 @@ function createSim(srcDir, opts) {
       return JSON.parse(s);
     },
     page() { freshExecution(); return ctx.doGet().getContent(); },
+    /** GET with query parameters, like an outside system calling the /exec URL. */
+    get(params) { freshExecution(); const out = ctx.doGet({ parameter: params || {} }); return { mime: out.mime, body: JSON.parse(out.getContent()) }; },
     advanceClock(ms) { clockOffset += ms; },
     /** Pin the script's clock (Date / Date.now inside the project) to an ISO time; null restores real time. */
     setNow(iso) {

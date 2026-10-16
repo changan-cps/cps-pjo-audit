@@ -156,3 +156,76 @@ test('change plan: reason required, history kept, team/name/position stay comple
   env.ok('plan_cancel', env.bsa, { plan_id: q.id, reason: 'ไลน์หยุดผลิต' });
   assert.equal(cal().some(x => x.id === q.id), false);
 });
+
+test('retention: only data older than 2 days that CPS already received is removed; plans and their colours stay', () => {
+  const env = boot();
+  env.ok('plan_import', env.bsa, { workshop: 'BS', month: '2026-10', days: formDays() });
+  const plan = d => env.ok('calendar', env.bsa, { month: '2026-10' }).plans.find(p => p.planned_date === '2026-10-' + String(d).padStart(2, '0'));
+  // audit on 5 Oct with a × finding (creates an issue) and a photo, submitted on time
+  env.sim.setNow('2026-10-05T14:30:00+07:00');
+  const { id } = env.ok('plan_start', env.bsa, { plan_id: plan(5).id });
+  env.ok('ops', env.bsa, { audit_id: id, ops: [{ op_id: 'r1', type: 'mark', item_key: 'S1-1', occurrence: 1, value: 'pass' }, { op_id: 'r2', type: 'header', fields: { ois_current: 'yes' } }] });
+  env.sim.setNow('2026-10-05T15:31:00+07:00');
+  env.ok('submit', env.bsa, { audit_id: id });
+  const before = plan(5).state; assert.equal(before.code, 'ok');
+  // nothing is removed while CPS has not pulled
+  env.sim.setNow('2026-10-09T10:00:00+07:00');
+  assert.match(env.sim.call('runRetention_', true).skipped, /CPS ยังไม่เคยดึง/);
+  // CPS pulls twice (second pull confirms the first one was received)
+  env.sim.call('cpsRecordPull_', '2026-10-08T02:00:00.000Z');
+  env.sim.call('cpsRecordPull_', '2026-10-08T14:00:00.000Z');
+  // a fresh audit today must survive
+  env.sim.setNow('2026-10-09T14:30:00+07:00');
+  const fresh = env.ok('plan_start', env.bsa, { plan_id: plan(9).id }).id;
+  env.sim.setNow('2026-10-09T16:00:00+07:00');
+  const r = env.sim.call('runRetention_', true);
+  assert.equal(r.audits, 1); assert.ok(r.plans_snapshot >= 1);
+  assert.equal(env.sim.api('state', env.bsa, { audit_id: id }).code, 'not_found');
+  assert.ok(env.ok('state', env.bsa, { audit_id: fresh }).state);
+  // the plan still shows its result from the snapshot, linked audit marked as archived
+  const after = plan(5).state;
+  assert.equal(after.code, 'ok'); assert.equal(after.timing.minutes, 61);
+  assert.equal(after.audits[0].archived, true);
+  // archived + submitted plans stay locked
+  assert.match(env.sim.api('plan_update', env.bsa, { plan_id: plan(5).id, station: 'X1', reason: 'x' }).message, /ตรวจและส่งลงนามแล้ว/);
+  // plans are all still there
+  assert.equal(env.ok('calendar', env.bsa, { month: '2026-10' }).plans.length, 22);
+  // runs at most once a day unless forced
+  assert.equal(env.sim.call('runRetention_', false).skipped, 'ran recently');
+  env.sim.setNow(null);
+});
+
+test('CPS export: key required, full standard-form data, since/ack, then retention', () => {
+  const env = boot();
+  env.ok('plan_import', env.bsa, { workshop: 'BS', month: '2026-10', days: formDays() });
+  const plan5 = env.ok('calendar', env.bsa, { month: '2026-10' }).plans.find(p => p.planned_date === '2026-10-05');
+  env.sim.setNow('2026-10-05T14:30:00+07:00');
+  const { id } = env.ok('plan_start', env.bsa, { plan_id: plan5.id });
+  env.ok('ops', env.bsa, { audit_id: id, ops: [{ op_id: 'c1', type: 'mark', item_key: 'S1-1', occurrence: 1, value: 'pass' }, { op_id: 'c2', type: 'header', fields: { ois_current: 'yes' } }] });
+  env.sim.setNow('2026-10-05T15:30:00+07:00');
+  env.ok('submit', env.bsa, { audit_id: id });
+  assert.equal(env.sim.get({ cps: 'export', key: 'x' }).body.code, 'not_setup');
+  const key = /\n([0-9a-f]{40})\n/.exec(env.sim.call('cpsExportSetup'))[1];
+  assert.equal(env.sim.get({ cps: 'export', key: 'wrong' }).body.code, 'forbidden');
+  const r1 = env.sim.get({ cps: 'export', key });
+  assert.equal(r1.mime, 'application/json');
+  const d = r1.body;
+  assert.equal(d.ok, true); assert.equal(d.schema, 'cps-pjo-export/1');
+  assert.equal(d.plans.length, 22);
+  assert.equal(d.audits.length, 1);
+  const a = d.audits[0];
+  assert.equal(a.index.station, 'EH04'); assert.equal(a.audit.marks['S1-1|1'].v, 'pass');
+  assert.ok(a.snapshot.s1 && a.snapshot.s2 && a.snapshot.s3 && a.snapshot.s4, 'standard form (4 sheets) of the template version'); assert.equal(a.snapshot.form_code, 'CATH-CPS009-B02');
+  assert.equal(a.audit_time.minutes, 60); assert.equal(a.plan.planned_date, '2026-10-05');
+  assert.equal(d.plans.find(p => p.id === plan5.id).state.code, 'ok');
+  assert.match(d.retention.skipped, /CPS ยังไม่เคยดึง/);   // first pull: nothing confirmed yet
+  // later pulls: since = last generated_at returns only changes; ack confirms delivery
+  env.sim.setNow('2026-10-08T02:00:00+07:00');
+  const r2 = env.sim.get({ cps: 'export', key, since: d.generated_at, ack: d.generated_at }).body;
+  assert.equal(r2.audits.length, 0);
+  assert.equal(r2.retention.audits, 1);   // older than 2 days and already delivered → cleared here
+  assert.equal(env.ok('calendar', env.bsa, { month: '2026-10' }).plans.find(p => p.id === plan5.id).state.code, 'ok');
+  // the normal app page still works
+  assert.match(env.sim.page(), /CPS PJO Audit/);
+  env.sim.setNow(null);
+});

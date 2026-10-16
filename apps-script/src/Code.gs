@@ -8,7 +8,8 @@ var APP_NAME = 'CPS PJO Audit';
 // Icon shown in the browser tab / Android shortcut. Hosted with the launcher on GitHub Pages (docs/).
 var ICON_URL = 'https://changan-cps.github.io/cps-pjo-audit/icons/icon-192.png';
 
-function doGet() {
+function doGet(e) {
+  if (isCpsRequest_(e)) return cpsExport_(e.parameter);  // CPS System pull (CpsExport.gs)
   var out = HtmlService.createTemplateFromFile('Index').evaluate()
     .setTitle(APP_NAME)
     .addMetaTag('viewport', 'width=device-width, initial-scale=1, viewport-fit=cover')

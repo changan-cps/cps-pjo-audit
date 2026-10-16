@@ -54,6 +54,12 @@ function auditTiming_(a, win) {
 function planStatus_(plan, audits, today, nowMin, win) {
   var live = audits.filter(function (a) { return a.status !== 'cancelled'; })
     .sort(function (a, b) { return Number(b.id) - Number(a.id); });
+  if (!live.length && plan.snapshot) {
+    // the audit itself was cleared after CPS received it (Retention.gs) – keep showing its result
+    var snap = JSON.parse(plan.snapshot);
+    return { code: snap.code, label: PLAN_STATUS[snap.code].label, color: PLAN_STATUS[snap.code].color, timing: snap.timing, why: snap.why || [],
+             audits: (snap.audits || []).map(function (x) { return Object.assign({}, x, { archived: true }); }), archived_at: snap.at };
+  }
   var a = live[0], code, timing = a ? auditTiming_(a, win) : null;
   var afterWindow = plan.planned_date < today || (plan.planned_date === today && nowMin > toMin_(win.end) + win.grace);
   if (!a) code = afterWindow ? 'missed' : plan.planned_date === today ? 'today' : 'planned';
@@ -72,7 +78,7 @@ function planStatus_(plan, audits, today, nowMin, win) {
 
 function planOut_(pl, auditsByPlan, today, nowMin, win) {
   var o = clean_(pl);
-  delete o.history;
+  delete o.history; delete o.snapshot;
   o.history_count = pl.history ? JSON.parse(pl.history).length : 0;
   o.state = planStatus_(pl, auditsByPlan[pl.id] || [], today, nowMin, win);
   return o;
@@ -116,7 +122,8 @@ API.plan_update = function (u, p) {
     require_(canCreateAudit(u, pl.workshop));
     var reason = String(p.reason || '').trim();
     if (!reason) throw new RuleError('ระบุเหตุผลการเปลี่ยนแผน เช่น พนักงานลา');
-    var done = rows_('Audits').some(function (a) { return a.plan_id === pl.id && a.status !== 'cancelled' && a.submitted_at; });
+    var done = rows_('Audits').some(function (a) { return a.plan_id === pl.id && a.status !== 'cancelled' && a.submitted_at; }) ||
+      (pl.snapshot && (JSON.parse(pl.snapshot).audits || []).some(function (a) { return a.timing && a.timing.finished_at; }));
     if (done) throw new RuleError('แผนนี้ตรวจและส่งลงนามแล้ว เปลี่ยนแผนไม่ได้');
     if (p.planned_date !== undefined && !/^\d{4}-\d{2}-\d{2}$/.test(p.planned_date)) throw new RuleError('วันที่ไม่ถูกต้อง');
     var ch = {}, from = {}, to = {};
