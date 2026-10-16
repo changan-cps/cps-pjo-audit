@@ -1991,13 +1991,15 @@ function cpsExport_(params, method) {
 var CPS_PING = /^(ping|test|health|check|status|info|meta|version|hello)$/i;
 function cpsExportInner_(params) {
   var key = PropertiesService.getScriptProperties().getProperty(CPS_KEY_PROP);
-  var given = String(params.key || params.export_key || params.exportKey || params.api_key || params.apikey || params.token || '');
+  var raw = String(params.key || params.export_key || params.exportKey || params.api_key || params.apikey || params.token || '');
+  var m = /[0-9a-f]{40}/.exec(raw.toLowerCase()), given = m ? m[0] : raw.trim();  // tolerate spaces / quotes / extra text around the key
   var action = String(params.action || params.mode || params.fn || params.op || params.cmd || '');
   var service = { service: 'cps-pjo-audit', schema: 'cps-pjo-export/1', app: APP_NAME, server_time: nowIso() };
   if (!key) return Object.assign({ ok: false, code: 'not_setup', message: 'ยังไม่ได้สร้าง Export key — รันฟังก์ชัน cpsExportSetup ใน Apps Script' }, service);
   if (!given) return Object.assign({ ok: false, code: 'key_required', message: 'ต้องส่ง Export key (พารามิเตอร์ key)' }, service);
   if (given.length !== key.length || Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, given).join() !== Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, key).join())
-    return Object.assign({ ok: false, code: 'forbidden', message: 'Export key ไม่ถูกต้อง' }, service);
+    return Object.assign({ ok: false, code: 'forbidden', message: 'Export key ไม่ถูกต้อง — key ที่ถูกต้องเป็นตัวอักษร 0-9 a-f ยาว 40 ตัว (ได้รับ ' + raw.trim().length + ' ตัว ขึ้นต้น "' + raw.trim().slice(0, 6) + '…")' +
+      (/^AKfy/.test(raw.trim()) ? ' — ที่ใส่มาคือรหัส Deployment ไม่ใช่ Export key' : '') + ' ดู key ได้จากการรันฟังก์ชัน cpsExportSetup ใน Apps Script' }, service);
   if (CPS_PING.test(action)) {
     return Object.assign({ ok: true, message: 'เชื่อมต่อ PJO Audit สำเร็จ',
       counts: { audits: rows_('Audits').length, issues: rows_('Issues').length, plans: rows_('Plans').length } }, service);
