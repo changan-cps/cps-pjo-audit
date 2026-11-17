@@ -237,3 +237,22 @@ test('CPS export: key required, full standard-form data, since/ack, then retenti
   assert.match(env.sim.page(), /CPS PJO Audit/);
   env.sim.setNow(null);
 });
+
+test('OIS list: add / duplicate station / import / permissions / delete', () => {
+  const env = boot();
+  const r = env.ok('ois_save', env.bsa, { workshop: 'BS', station: ' bs 23 ', ois_name: 'เชื่อมประตู', people: [{ name: 'พนักงาน  5' }, { name: 'สมศรี' }, { name: 'พนักงาน 5' }], sc: true });
+  const list = () => env.ok('ois_list', env.bsa, {}).rows;
+  assert.equal(list()[0].station, 'BS23');
+  assert.deepEqual(list()[0].people, [{ code: 'B05', name: 'พนักงาน 5' }, { code: '', name: 'สมศรี' }]);
+  assert.equal(list()[0].sc, true); assert.equal(list()[0].cc, false);
+  assert.match(env.sim.api('ois_save', env.bsa, { workshop: 'BS', station: 'BS23', ois_name: 'x' }).message, /มีใน OIS List ของ BS แล้ว/);
+  assert.match(env.sim.api('ois_save', env.bsa, { workshop: 'BS', station: 'BS24', ois_name: '' }).message, /ชื่อ OIS/);
+  assert.equal(env.sim.api('ois_save', env.gaa, { workshop: 'BS', station: 'BS30', ois_name: 'x' }).code, 'forbidden');
+  const imp = env.ok('ois_import', env.bsa, { workshop: 'BS', text: 'สถานีงาน\tชื่อ OIS\tผู้ทำงาน\tSC/CC\nBS23\tเชื่อมประตู v2\tพนักงาน 6; สมชาย\tSC CC\nBS24\tประกอบฝา\t\tCC\nBS25\t\t\t' });
+  assert.deepEqual([imp.added, imp.updated, imp.errors.length], [1, 1, 1]);
+  const bs23 = list().find(x => x.station === 'BS23');
+  assert.equal(bs23.ois_name, 'เชื่อมประตู v2'); assert.equal(bs23.sc && bs23.cc, true); assert.equal(bs23.people[0].code, 'B06');
+  assert.equal(env.ok('ois_list', env.gaa, {}).rows.length, 0);   // another workshop cannot see it
+  env.ok('ois_delete', env.bsa, { id: r.id });
+  assert.equal(list().length, 1);
+});

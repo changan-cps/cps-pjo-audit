@@ -24,7 +24,8 @@ var TABLES = {
   Settings: ['key', 'value', 'updated_by', 'updated_at'],
   Counters: ['name', 'value'],
   Trail: ['at', 'user', 'action', 'audit_id', 'issue_id', 'data'],
-  Blobs: ['key', 'part', 'text']
+  Blobs: ['key', 'part', 'text'],
+  OisList: ['id', 'workshop', 'station', 'ois_name', 'people', 'sc_cc', 'active', 'updated_by', 'updated_at']
 };
 
 function db_() {
@@ -38,6 +39,12 @@ function sheet_(name) {
   db_._sheets = db_._sheets || {};
   if (!db_._sheets[name]) {
     var sh = db_().getSheetByName(name);
+    if (!sh && TABLES[name]) {  // a table added after setup (older deployments): create it on first use
+      sh = db_().insertSheet(name);
+      sh.getRange(1, 1, 2, TABLES[name].length).setNumberFormat('@');
+      sh.getRange(1, 1, 1, TABLES[name].length).setValues([TABLES[name]]).setFontWeight('bold');
+      sh.setFrozenRows(1);
+    }
     if (!sh) throw new Error('missing sheet ' + name);
     db_._sheets[name] = sh;
   }

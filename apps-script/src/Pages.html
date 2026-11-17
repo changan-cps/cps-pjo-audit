@@ -74,7 +74,7 @@
     });
   }
 
-  var NAV = [['#/', 'Dashboard'], ['#/calendar', 'ปฏิทินแผนตรวจ'], ['#/plans', 'แผนและรายการตรวจ PJO'], ['#/start', 'เริ่มตรวจ PJO'], ['#/issues', 'ติดตามปัญหา'],
+  var NAV = [['#/calendar', 'แผนการดำเนินการ PJO'], ['#/ois', 'OIS List'], ['#/', 'Dashboard'], ['#/plans', 'แผนและรายการตรวจ PJO'], ['#/start', 'เริ่มตรวจ PJO'], ['#/issues', 'ติดตามปัญหา'],
     ['#/signatures', 'รายการรอลงนาม'], ['#/standards', 'จัดการแม่แบบและมาตรฐาน'], ['#/reports', 'รายงานและ Export']];
   function shell() {
     app.textContent = '';
@@ -113,6 +113,7 @@
     if (path === '#/' || path === '#' || path === '') { setNav('#/'); return dashboard(main); }
     if (path === '#/plans') { setNav('#/plans'); return plans(main); }
     if (path === '#/calendar') { setNav('#/calendar'); return calendar(main); }
+    if (path === '#/ois') { setNav('#/ois'); return ois(main); }
     if (path === '#/start') { setNav('#/start'); return startAudit(main); }
     if ((m = /^#\/audit\/(\d+)$/.exec(path))) { setNav('#/start'); return openAudit(main, m[1]); }
     if (path === '#/issues') { setNav('#/issues'); return issues(main); }
@@ -277,7 +278,7 @@
         d.can_plan.length ? h('button', { type: 'button', class: 'btn primary', onclick: function () { importPlans(p); } }, 'นำเข้าแผน (Excel / PDF)') : null,
         h('button', { type: 'button', class: 'btn', onclick: function () { holidayDialog(month.slice(0, 4), PJO.route); } }, 'วันหยุดโรงงาน'));
       var w = d.window, sum = d.summary;
-      main.append(pagehead('ปฏิทินแผนตรวจ PJO', 'ตรวจทุกวันทำงาน ' + w.start + '–' + w.end + ' น. อย่างน้อย ' + w.min_minutes + ' นาที', right),
+      main.append(pagehead('แผนการดำเนินการ PJO', 'ตรวจทุกวันทำงาน ' + w.start + '–' + w.end + ' น. อย่างน้อย ' + w.min_minutes + ' นาที', right),
         h('div', { class: 'cal-bar' },
           h('div', { class: 'cal-month' }, h('button', { type: 'button', class: 'btn', 'aria-label': 'เดือนก่อน', onclick: function () { nav(monthAdd(month, -1)); } }, '‹'),
             h('b', { text: monthTh(month) }), h('button', { type: 'button', class: 'btn', 'aria-label': 'เดือนถัดไป', onclick: function () { nav(monthAdd(month, 1)); } }, '›'),
@@ -657,6 +658,58 @@
           return [auditLink(a), PJO.fmtDate(a.audit_date), a.workshop, a.station, a.employee_name, a.revision, PJO.badge('b-' + a.status, a.status_th),
             h('span', { class: 'btnrow' }, h('a', { class: 'btn small', href: '#/print/' + a.id }, 'พิมพ์ / PDF'), h('button', { class: 'btn small', type: 'button', onclick: function () { PJO.exportAuditXlsx(a.id); } }, 'Excel'))];
         })));
+    });
+  }
+
+  // ---------------------------------------------------------------- OIS List (master data for building plans)
+  function ois(main) {
+    var p = q();
+    loading(main);
+    Promise.all([PJO.get('ois_list', { workshop: p.workshop }), lookups()]).then(function (res) {
+      var d = res[0], lk = res[1];
+      main.textContent = '';
+      var editable = lk.workshops.filter(function (w) { return d.can_edit.indexOf(w.code) >= 0; });
+      function flagChip(r) { return h('span', null, r.sc ? PJO.badge('b-cancelled', 'SC') : null, r.sc && r.cc ? ' ' : null, r.cc ? PJO.badge('b-amended', 'CC') : null); }
+      function form(r) {
+        var people = h('textarea', { id: 'o_people', placeholder: 'ชื่อพนักงานที่ทำงานตำแหน่งนี้ บรรทัดละ 1 คน', style: 'min-height:110px' });
+        people.value = r ? r.people.map(function (x) { return x.name; }).join('\n') : '';
+        var chk = function (id, label, on) { var c = h('input', { type: 'checkbox', id: id }); c.checked = !!on; return h('label', { style: 'display:flex;gap:6px;align-items:center' }, c, label); };
+        var body = h('div', null, h('div', { class: 'grid' },
+          sel('o_ws', 'Workshop', editable.map(function (w) { return [w.code, w.name]; }), r ? r.workshop : (p.workshop || (editable[0] && editable[0].code))),
+          inp('o_station', 'สถานีงาน (หมายเลขตำแหน่งงาน) *', 'text', r ? r.station : ''), inp('o_name', 'ชื่อ OIS *', 'text', r ? r.ois_name : '', { wide: true }),
+          h('div', { class: 'wide' }, h('label', { for: 'o_people', text: 'ผู้ที่ทำงานตำแหน่งนี้' }), people),
+          h('div', { class: 'btnrow wide' }, chk('o_sc', 'SC', r && r.sc), chk('o_cc', 'CC', r && r.cc), r ? chk('o_active', 'ใช้งานอยู่', r.active) : null)));
+        var save = h('button', { type: 'button', class: 'btn primary' }, 'บันทึก');
+        var m = PJO.modal(r ? 'แก้ไขตำแหน่ง ' + r.station : 'เพิ่มตำแหน่งใน OIS List', body, [h('button', { type: 'button', class: 'btn', onclick: function () { m.close(); } }, 'ยกเลิก'), save]);
+        save.addEventListener('click', function () {
+          PJO.get('ois_save', { id: r ? r.id : '', workshop: val('o_ws'), station: val('o_station'), ois_name: val('o_name'), sc: val('o_sc'), cc: val('o_cc'),
+            active: r ? val('o_active') : true, people: people.value.split(/\r?\n/).map(function (x) { return { name: x }; }) })
+            .then(function () { m.close(); PJO.toast('บันทึกแล้ว'); PJO.route(); });
+        });
+      }
+      function importForm() {
+        var text = h('textarea', { id: 'oi_text', placeholder: 'วางจาก Excel: สถานีงาน [Tab] ชื่อ OIS [Tab] ผู้ทำงาน (คั่นหลายคนด้วย ;) [Tab] SC หรือ CC', style: 'min-height:160px' });
+        var body = h('div', null, h('div', { class: 'grid' }, sel('oi_ws', 'Workshop', editable.map(function (w) { return [w.code, w.name]; }), p.workshop || (editable[0] && editable[0].code))),
+          h('p', { class: 'muted', text: 'สถานีงานที่มีอยู่แล้วจะถูกปรับปรุงตามข้อมูลที่วาง' }), text);
+        var go = h('button', { type: 'button', class: 'btn primary' }, 'นำเข้า');
+        var m = PJO.modal('นำเข้า OIS List', body, [h('button', { type: 'button', class: 'btn', onclick: function () { m.close(); } }, 'ยกเลิก'), go]);
+        go.addEventListener('click', function () {
+          PJO.get('ois_import', { workshop: val('oi_ws'), text: text.value }).then(function (r) {
+            m.close(); PJO.toast('เพิ่ม ' + r.added + ' · ปรับปรุง ' + r.updated + (r.errors.length ? ' · ผิดพลาด ' + r.errors.length : ''));
+            if (r.errors.length) PJO.modal('รายการที่นำเข้าไม่ได้', h('div', null, r.errors.map(function (e) { return h('div', { text: e }); })));
+            PJO.route();
+          });
+        });
+      }
+      main.append(pagehead('OIS List', 'สถานีงาน ผู้ทำงาน และตำแหน่ง SC / CC — ข้อมูลตั้งต้นสำหรับทำแผนงานอัตโนมัติ',
+          editable.length ? h('div', { class: 'btnrow' }, h('button', { type: 'button', class: 'btn', onclick: importForm }, 'นำเข้าจาก Excel'),
+            h('button', { type: 'button', class: 'btn primary', onclick: function () { form(null); } }, '+ เพิ่มตำแหน่ง')) : null),
+        h('div', { class: 'filters' }, wsFilter(p.workshop, function (e) { go('#/ois' + qs({ workshop: e.target.value })); })),
+        table(['Workshop', 'สถานีงาน', 'ชื่อ OIS', 'ผู้ที่ทำงานตำแหน่งนี้', 'SC / CC', ''], d.rows.map(function (r) {
+          return [r.workshop, h('b', { text: r.station }), r.ois_name, r.people.map(function (x) { return x.name; }).join(', ') || h('span', { class: 'muted', text: '-' }), flagChip(r),
+            d.can_edit.indexOf(r.workshop) >= 0 ? h('span', { class: 'btnrow' }, h('button', { type: 'button', class: 'btn small', onclick: function () { form(r); } }, 'แก้ไข'),
+              h('button', { type: 'button', class: 'btn small', onclick: function () { if (confirm('ลบ ' + r.station + ' ออกจาก OIS List?')) PJO.get('ois_delete', { id: r.id }).then(function () { PJO.route(); }); } }, 'ลบ')) : ''];
+        }), 'ยังไม่มีข้อมูล OIS List'));
     });
   }
 
