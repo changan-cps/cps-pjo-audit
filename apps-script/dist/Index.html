@@ -351,7 +351,7 @@ a.btn { color: var(--ink); } a.btn.primary { color:#fff; }
 .pi-repl { display: flex; gap: 8px; align-items: center; margin: 6px 0 10px; font-weight: 600; }
 .pi-repl input { width: 20px; height: 20px; }
 .pi-list { border: 1px solid var(--line); border-radius: 8px; }
-.pi-row { display: grid; grid-template-columns: 110px 90px minmax(150px, 1.3fr) 130px 64px minmax(170px, 1.4fr); gap: 6px; padding: 6px 8px; border-bottom: 1px solid var(--line-2); align-items: start; }
+.pi-row { display: grid; grid-template-columns: 110px 100px minmax(160px, 1.3fr) 130px minmax(190px, 1.5fr); gap: 6px; padding: 6px 8px; border-bottom: 1px solid var(--line-2); align-items: start; }
 .pi-row input:not([type=checkbox]) { width: 100%; min-height: 38px; padding: 6px 8px; font-size: 1rem; }
 .pi-headrow { background: var(--head); font-weight: 700; position: sticky; top: 52px; z-index: 1; }
 .pi-row.off { background: #f5f6f8; }
@@ -987,10 +987,10 @@ var PJO = window.PJO || {};
         } else replWrap.style.display = 'none';
         var focusId = document.activeElement && document.activeElement.id, caret = document.activeElement && document.activeElement.selectionStart;
         list.textContent = '';
-        list.append(h('div', { class: 'pi-row pi-headrow' }, ['วันที่', 'ทีม', 'ชื่อพนักงาน', 'หมายเลขตำแหน่งงาน', 'ระดับ', 'ผลตรวจสอบ'].map(function (t) { return h('div', { text: t }); })));
+        list.append(h('div', { class: 'pi-row pi-headrow' }, ['วันที่', 'ทีม', 'ชื่อพนักงาน', 'หมายเลขตำแหน่งงาน', 'ผลตรวจสอบ'].map(function (t) { return h('div', { text: t }); })));
         r.days.forEach(function (d) {
           var src = state.days[d.day] = state.days[d.day] || { day: d.day };
-          var off = d.weekend || d.holiday_name || src.holiday;
+          var off = d.weekend || d.holiday_name || src.holiday || d.marked_holiday;
           function field(key, ph, cls) {
             var i = h('input', { id: 'pi-' + key + '-' + d.day, value: src[key] || '', placeholder: ph, class: cls || '', 'aria-label': ph + ' วันที่ ' + d.day });
             i.addEventListener('input', function () { src[key] = i.value; later(); });
@@ -1004,7 +1004,7 @@ var PJO = window.PJO || {};
           }
           list.append(h('div', { class: 'pi-row st-' + d.status + (off ? ' off' : '') },
             h('div', { class: 'pi-date' }, h('b', { text: d.weekday + ' ' + d.day }), d.holiday_name ? h('small', { text: d.holiday_name }) : d.weekend ? h('small', { text: 'เสาร์-อาทิตย์' }) : null, hol),
-            field('team', 'ทีม'), field('name', 'ชื่อพนักงาน'), field('station', 'ตำแหน่งงาน'), field('level', 'A/B/C', 'pi-level'),
+            field('team', 'ทีม'), field('name', 'ชื่อพนักงาน'), field('station', 'ตำแหน่งงาน'),
             h('div', { class: 'pi-msg' }, d.messages.length ? d.messages.map(function (m) { return h('div', { class: 'm-' + m.type, text: m.text }); })
               : h('div', { class: 'm-ok', text: d.status === 'ok' ? '✓ ครบ' : 'วันหยุด' }))));
         });

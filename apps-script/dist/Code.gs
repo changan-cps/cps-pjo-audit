@@ -1866,23 +1866,31 @@ function matchEmployee_(workshop, name) {
  * Every working day (Mon–Fri that is not a factory holiday) must have team + employee name + position number.
  * Saturdays, Sundays and factory holidays may be left empty.
  */
+var HOLIDAY_WORD_RE = /หยุด|ชดเชย|^วัน|holiday|^off$/i;
 API.plan_import = function (u, p) {
   if (!rows_('Workshops').some(function (w) { return w.code === p.workshop; })) throw new RuleError('เลือก Workshop');
   require_(canCreateAudit(u, p.workshop));
   if (!/^\d{4}-\d{2}$/.test(p.month || '')) throw new RuleError('ระบุเดือนของแผน');
   var hol = holidayMap_(), n = daysInMonth_(p.month), byDay = {};
   (p.days || []).forEach(function (d) { if (d && d.day >= 1 && d.day <= n) byDay[Number(d.day)] = d; });
-  var res = { workshop: p.workshop, month: p.month, days: [], errors: 0, warnings: 0, working_days: 0, planned: 0, new_teams: [], new_holidays: [] };
+  var res = { workshop: p.workshop, month: p.month, days: [], errors: 0, warnings: 0, working_days: 0, planned: 0, new_teams: [], new_holidays: [], holiday_names: {} };
   var stationDays = {}, teamsSeen = {};
   for (var d = 1; d <= n; d++) {
     var iso = p.month + '-' + pad2_(d), src = byDay[d] || {};
     var r = { day: d, date: iso, weekday: WEEKDAY_TH[weekday_(iso)], weekend: isWeekend_(iso), holiday_name: hol[iso] || '', marked_holiday: !!src.holiday && !hol[iso],
               team: String(src.team || '').trim(), name: String(src.name || '').replace(/\s+/g, ' ').trim(), station: String(src.station || '').replace(/\s+/g, '').trim(),
               level: String(src.level || '').trim().toUpperCase(), problems: String(src.problems || '').trim(), note: String(src.note || '').trim(), messages: [] };
+    // the paper form often writes the holiday in the team row ("วันหยุด", "ชดเชยวันพ่อ", "วันรัฐธรรมนูญ") with no name/position
+    if (r.team && !r.name && !r.station && HOLIDAY_WORD_RE.test(r.team)) {
+      var label = r.team;
+      r.team = '';
+      if (!r.weekend && !r.holiday_name) { r.marked_holiday = true; r.holiday_label = /^วันหยุด$|^หยุด$|^off$|^holiday$/i.test(label) ? 'วันหยุดโรงงาน' : label; }
+      r.messages.push({ type: 'info', text: '"' + label + '" ในแถวทีม → ถือเป็นวันหยุด' });
+    }
     var off = r.weekend || !!r.holiday_name || r.marked_holiday;
     var has = !!(r.team || r.name || r.station);
     if (!off) res.working_days++;
-    if (r.marked_holiday) res.new_holidays.push(iso);
+    if (r.marked_holiday) { res.new_holidays.push(iso); res.holiday_names[iso] = r.holiday_label || 'วันหยุดโรงงาน'; }
     if (has) {
       var miss = [];
       if (!r.team) miss.push('ทีม');
@@ -1891,8 +1899,7 @@ API.plan_import = function (u, p) {
       if (miss.length) r.messages.push({ type: 'error', text: 'ขาด: ' + miss.join(', ') });
       else res.planned++;
       if (off) r.messages.push({ type: 'info', text: (r.holiday_name || (r.marked_holiday ? 'วันหยุดโรงงาน' : 'วันเสาร์/อาทิตย์')) + ' แต่มีแผน — นำเข้าตามไฟล์' });
-      if (r.station && !/^[A-Z]{2,3}\d{2,3}[A-Z]?$/.test(r.station)) r.messages.push({ type: 'warn', text: 'หมายเลขตำแหน่งงาน "' + r.station + '" รูปแบบผิดปกติ' });
-      if (r.level && ['A', 'B', 'C'].indexOf(r.level) < 0) r.messages.push({ type: 'warn', text: 'ระดับตำแหน่งงานควรเป็น A, B หรือ C' });
+      if (r.station && !(/^[A-Z][A-Z0-9]*(-[A-Z0-9]+)*$/.test(r.station) && /\d/.test(r.station))) r.messages.push({ type: 'warn', text: 'หมายเลขตำแหน่งงาน "' + r.station + '" รูปแบบผิดปกติ' });
       if (r.name) { r.employee_code = matchEmployee_(p.workshop, r.name); if (!r.employee_code) r.messages.push({ type: 'info', text: 'ไม่พบชื่อในรายชื่อพนักงาน — บันทึกเป็นชื่อ' }); }
       if (r.team) { r.team_id = teamIdFor_(p.workshop, r.team, false); if (!r.team_id && !teamsSeen[r.team.toLowerCase()]) { teamsSeen[r.team.toLowerCase()] = true; res.new_teams.push(r.team); } }
       if (r.station) (stationDays[r.station] = stationDays[r.station] || []).push(d);
@@ -1924,7 +1931,7 @@ API.plan_import = function (u, p) {
     ensureHeader_('Plans');
     if (res.new_holidays.length) {
       var list = holidays_();
-      res.new_holidays.forEach(function (iso) { list.push({ date: iso, name: 'วันหยุดโรงงาน' }); });
+      res.new_holidays.forEach(function (iso) { list.push({ date: iso, name: res.holiday_names[iso] || 'วันหยุดโรงงาน' }); });
       list.sort(function (a, b) { return a.date < b.date ? -1 : 1; });
       settingPut('factory_holidays', list, u.username);
     }

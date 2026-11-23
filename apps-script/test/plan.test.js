@@ -300,3 +300,32 @@ test('plan import deadline: next month due on the 25th; not imported after it = 
   assert.equal(env.sim.api('plan_due_save', env.admin, { day: 31 }).ok, false);
   env.sim.setNow(null);
 });
+
+test('import: holiday words in the team row count as holidays; GA-FN-05 style positions; no level needed', () => {
+  const env = boot();
+  // December 2026: 1 Dec = Tuesday. Like the GA sheet: holiday names written in the team row, no level column.
+  const days = [];
+  for (let d = 1; d <= 31; d++) {
+    const wd = new Date(Date.UTC(2026, 11, d)).getUTCDay();
+    if (wd === 0 || wd === 6) days.push({ day: d, team: 'วันหยุด' });
+    else days.push({ day: d, team: 'Final', name: 'คนที่ ' + d, station: 'GA-FN-' + String(d).padStart(2, '0') });
+  }
+  days[6] = { day: 7, team: 'ชดเชยวันพ่อ' };
+  days[9] = { day: 10, team: 'วันรัฐธรรมนูญ' };
+  days[30] = { day: 31, team: 'วันสิ้นปี' };
+  const r = env.ok('plan_import', env.bsa, { workshop: 'BS', month: '2026-12', dry_run: true, days });
+  assert.equal(r.errors, 0, JSON.stringify(r.days.filter(d => d.status === 'error').map(d => [d.day, d.messages])));
+  assert.equal(r.warnings, 0, 'GA-FN-05 is a normal position code');
+  assert.deepEqual(r.new_teams, ['Final'], 'holiday words do not become teams');
+  assert.deepEqual(r.new_holidays, ['2026-12-07', '2026-12-10', '2026-12-31']);
+  assert.equal(r.days[4].status, 'off');                       // Saturday "วันหยุด"
+  assert.match(r.days[6].messages[0].text, /ชดเชยวันพ่อ/);
+  assert.equal(r.planned, 20);
+  const done = env.ok('plan_import', env.bsa, { workshop: 'BS', month: '2026-12', days });
+  assert.equal(done.created, 20);
+  assert.deepEqual(env.ok('holidays', env.bsa, { year: 2026 }).holidays.filter(h => h.date >= '2026-12').map(h => [h.date, h.name]),
+    [['2026-12-07', 'ชดเชยวันพ่อ'], ['2026-12-10', 'วันรัฐธรรมนูญ'], ['2026-12-31', 'วันสิ้นปี']]);
+  // a real team that happens to start with วัน but has a person and a position is still a plan
+  const r2 = env.ok('plan_import', env.bsa, { workshop: 'BS', month: '2027-01', dry_run: true, days: [{ day: 4, team: 'วันชัย', name: 'ก', station: 'BS01' }] });
+  assert.equal(r2.days[3].team, 'วันชัย');
+});
