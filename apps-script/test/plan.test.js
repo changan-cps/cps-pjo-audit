@@ -78,8 +78,8 @@ test('import: factory holiday ticked in the check, teams created, re-import repl
   // audit one plan, then re-import with "replace": the audited plan stays, the rest are replaced
   env.ok('plan_start', env.bsa, { plan_id: p5.id });
   const again = env.ok('plan_import', env.bsa, { workshop: 'BS', month: '2026-10', days, replace: true });
-  assert.deepEqual([again.created, again.replaced, again.kept], [20, 19, 1]);
-  assert.equal(env.ok('calendar', env.bsa, { month: '2026-10', workshop: 'BS' }).plans.length, 21);
+  assert.deepEqual([again.created, again.replaced, again.kept], [19, 19, 1]);   // the audited day is not duplicated
+  assert.equal(env.ok('calendar', env.bsa, { month: '2026-10', workshop: 'BS' }).plans.length, 20);
 });
 
 test('calendar colours + audit time window 14:30–15:30 and 60 minutes', () => {
@@ -255,4 +255,40 @@ test('OIS list: add / duplicate station / import / permissions / delete', () => 
   assert.equal(env.ok('ois_list', env.gaa, {}).rows.length, 0);   // another workshop cannot see it
   env.ok('ois_delete', env.bsa, { id: r.id });
   assert.equal(list().length, 1);
+});
+
+test('auto plan from OIS list: working days only, rotation, SC/CC and problem stations first, people rotate, import keeps audited plan', () => {
+  const env = boot();
+  env.ok('admin_team_save', env.admin, { workshop: 'BS', group: '', name: 'Team A', line: '' });
+  env.ok('admin_employees_import', env.admin, { text: 'B07\tพนักงาน 7\tBS\tTeam A' });
+  assert.match(env.sim.api('plan_generate', env.bsa, { workshop: 'BS', month: '2026-12' }).message, /OIS List/);
+  const sts = ['BS01', 'BS02', 'BS03', 'BS04'];
+  sts.forEach((s, i) => env.ok('ois_save', env.bsa, { workshop: 'BS', station: s, ois_name: 'OIS ' + s, people: i === 0 ? [{ name: 'พนักงาน 7' }, { name: 'พนักงาน 5' }] : [{ name: 'พนักงาน 5' }], cc: i === 2 }));
+  env.ok('ois_save', env.bsa, { workshop: 'BS', station: 'BS05', ois_name: 'ไม่มีคน', people: [] });
+  env.ok('holiday_save', env.bsa, { date: '2026-12-10', name: 'หยุด' });
+  const g = env.ok('plan_generate', env.bsa, { workshop: 'BS', month: '2026-12' });
+  const work = g.days.filter(d => d.station);
+  assert.equal(g.days.length, 31);
+  assert.equal(work.length, 23 - 1);                          // 23 weekdays in Dec 2026 minus the factory holiday
+  assert.ok(!g.days[9].station);                              // 10 Dec = factory holiday
+  assert.equal(g.days[4].station, '');                        // Saturday
+  assert.equal(work[0].station, 'BS03');                      // CC position first (nothing planned before), then by station
+  assert.deepEqual(work.slice(0, 5).map(d => d.station), ['BS03', 'BS01', 'BS02', 'BS04', 'BS05']);
+  assert.equal(work[5].station, 'BS03');                      // second round
+  assert.equal(work.find(d => d.station === 'BS01').name, 'พนักงาน 7');
+  assert.equal(work.find(d => d.station === 'BS01').team, 'Team A');
+  const second = work.filter(d => d.station === 'BS01')[1];
+  assert.equal(second.name, 'พนักงาน 5');                     // people rotate
+  assert.equal(g.no_person.length, work.filter(d => d.station === 'BS05').length);   // 22 days / 5 positions → BS05 planned 4 times
+  assert.ok(g.no_person.length >= 4 && g.no_person.every(x => x === 'BS05'));
+  // fill the missing person/team and import; then re-generate: existing plans kept, audited plan not duplicated
+  const days = g.days.map(d => d.station ? Object.assign({}, d, { name: d.name || 'พนักงาน 9', team: d.team || 'Team A' }) : d);
+  env.ok('plan_import', env.bsa, { workshop: 'BS', month: '2026-12', days });
+  const cal = env.ok('calendar', env.bsa, { month: '2026-12', workshop: 'BS' }).plans;
+  assert.equal(cal.length, 22);
+  env.ok('plan_start', env.bsa, { plan_id: cal[0].id });
+  const g2 = env.ok('plan_generate', env.bsa, { workshop: 'BS', month: '2026-12' });
+  assert.equal(g2.kept, 22); assert.equal(g2.generated, 0);
+  env.ok('plan_import', env.bsa, { workshop: 'BS', month: '2026-12', days: g2.days, replace: true });
+  assert.equal(env.ok('calendar', env.bsa, { month: '2026-12', workshop: 'BS' }).plans.length, 22);
 });

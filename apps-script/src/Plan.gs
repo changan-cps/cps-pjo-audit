@@ -300,8 +300,11 @@ API.plan_import = function (u, p) {
       replaced++;
     });
     var batch = 'IMP-' + bkk_(nowIso(), 'yyyyMMdd-HHmmss'), created = 0;
+    var keptKey = {};
+    existing.forEach(function (x) { if (auditPlanIds[x.id]) keptKey[x.planned_date + '|' + String(x.station).replace(/\s+/g, '').toUpperCase()] = true; });
     res.days.forEach(function (r) {
       if (!(r.team && r.name && r.station)) return;
+      if (p.replace && keptKey[r.date + '|' + r.station.toUpperCase()]) return;  // the audited plan of this day/position was kept
       insert_('Plans', { id: String(nextNumber_('plan-id')), workshop: p.workshop, team_id: teamIdFor_(p.workshop, r.team, true), station: r.station,
                          employee_code: r.employee_code || '', planned_date: r.date, auditor: '', note: r.note, cancelled: 'false',
                          created_by: u.username, created_at: nowIso(), team_name: r.team, employee_name: r.name, level: r.level,

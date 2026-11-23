@@ -448,6 +448,34 @@
       });
       check();
     }
+    if (opts.preset) review(opts.preset.name, opts.preset.parsed);
+  };
+
+  /** Automatic plan from the OIS List: pick workshop + month, the server proposes every working day, then the normal import screen opens to review. */
+  PJO.planGenerate = function (opts) {
+    var h = PJO.h, lk = opts.lookups, ws = lk.workshops.filter(function (w) { return w.can_create; });
+    var d = new Date(); d.setUTCMonth(d.getUTCMonth() + 1);
+    var next = d.getUTCFullYear() + '-' + ('0' + (d.getUTCMonth() + 1)).slice(-2);
+    var wsSel = h('select', { id: 'pg-ws' }, ws.map(function (w) { return h('option', { value: w.code, selected: w.code === opts.workshop }, w.name); }));
+    var mon = h('input', { type: 'month', id: 'pg-month', value: next });
+    var go = h('button', { type: 'button', class: 'btn primary' }, 'สร้างแผน');
+    var body = h('div', null, h('div', { class: 'grid' }, h('div', null, h('label', { for: 'pg-ws', text: 'Workshop' }), wsSel), h('div', null, h('label', { for: 'pg-month', text: 'เดือนของแผน' }), mon)),
+      h('ul', { class: 'muted' }, h('li', { text: 'วันละ 1 ตำแหน่ง เฉพาะวันทำงาน (ไม่รวมเสาร์-อาทิตย์และวันหยุดโรงงาน)' }),
+        h('li', { text: 'ลำดับ: จุดที่มีปัญหา → จุดที่ยังไม่ถูกวางแผนใน 60 วัน (ครบทุกตำแหน่งใน 2 เดือน) → SC / CC → ตำแหน่งที่ไม่ได้ตรวจนานที่สุด' }),
+        h('li', { text: 'ผู้ตรวจสอบ: หมุนเวียนคนที่ทำงานตำแหน่งนั้นตามลำดับ · ตรวจและแก้ไขในหน้าถัดไปก่อนนำเข้า' })));
+    var dlg = PJO.modal('สร้างแผนอัตโนมัติจาก OIS List', body, [h('button', { type: 'button', class: 'btn', onclick: function () { dlg.close(); } }, 'ยกเลิก'), go]);
+    go.addEventListener('click', function () {
+      if (!mon.value) { PJO.toast('เลือกเดือนของแผน', true); return; }
+      go.disabled = true;
+      PJO.call('plan_generate', { workshop: wsSel.value, month: mon.value }).then(function (r) {
+        go.disabled = false;
+        if (!r.ok) { PJO.toast(r.data.message, true); return; }
+        dlg.close();
+        var g = r.data;
+        PJO.planImport({ lookups: lk, workshop: g.workshop, onDone: opts.onDone, preset: { name: 'OIS List (' + g.stations + ' ตำแหน่ง · สร้าง ' + g.generated + ' วัน' + (g.kept ? ' · แผนเดิม ' + g.kept + ' วัน' : '') + ')',
+          parsed: { month: g.month, title: '', labels: [], days: g.days, kind: 'สร้างอัตโนมัติ', sheet: '', garbled: false } } });
+      }, function () { go.disabled = false; PJO.toast('เชื่อมต่อเซิร์ฟเวอร์ไม่ได้', true); });
+    });
   };
 })();
 </script>

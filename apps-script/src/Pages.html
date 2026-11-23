@@ -174,6 +174,11 @@
       PJO.planImport({ lookups: lk, workshop: p.workshop, onDone: function (r) { S.lookups = null; go('#/calendar' + qs({ month: r.month, workshop: p.workshop })); } });
     });
   }
+  function generatePlans(p) {
+    lookups().then(function (lk) {
+      PJO.planGenerate({ lookups: lk, workshop: p.workshop, onDone: function (r) { S.lookups = null; go('#/calendar' + qs({ month: r.month, workshop: p.workshop })); } });
+    });
+  }
   function planDialog(id, after) {
     PJO.get('plan_get', { plan_id: id }).then(function (pl) {
       lookups().then(function (lk) {
@@ -276,6 +281,7 @@
       var byDay = {}; d.plans.forEach(function (pl) { (byDay[pl.planned_date] = byDay[pl.planned_date] || []).push(pl); });
       var right = h('div', { class: 'btnrow' },
         d.can_plan.length ? h('button', { type: 'button', class: 'btn primary', onclick: function () { importPlans(p); } }, 'นำเข้าแผน (Excel / PDF)') : null,
+        d.can_plan.length ? h('button', { type: 'button', class: 'btn', onclick: function () { generatePlans(p); } }, 'สร้างแผนอัตโนมัติ (OIS List)') : null,
         h('button', { type: 'button', class: 'btn', onclick: function () { holidayDialog(month.slice(0, 4), PJO.route); } }, 'วันหยุดโรงงาน'));
       var w = d.window, sum = d.summary;
       main.append(pagehead('แผนการดำเนินการ PJO', 'ตรวจทุกวันทำงาน ' + w.start + '–' + w.end + ' น. อย่างน้อย ' + w.min_minutes + ' นาที', right),
@@ -703,6 +709,7 @@
       }
       main.append(pagehead('OIS List', 'สถานีงาน ผู้ทำงาน และตำแหน่ง SC / CC — ข้อมูลตั้งต้นสำหรับทำแผนงานอัตโนมัติ',
           editable.length ? h('div', { class: 'btnrow' }, h('button', { type: 'button', class: 'btn', onclick: importForm }, 'นำเข้าจาก Excel'),
+            h('button', { type: 'button', class: 'btn', onclick: function () { generatePlans(p); } }, 'สร้างแผนอัตโนมัติ'),
             h('button', { type: 'button', class: 'btn primary', onclick: function () { form(null); } }, '+ เพิ่มตำแหน่ง')) : null),
         h('div', { class: 'filters' }, wsFilter(p.workshop, function (e) { go('#/ois' + qs({ workshop: e.target.value })); })),
         table(['Workshop', 'สถานีงาน', 'ชื่อ OIS', 'ผู้ที่ทำงานตำแหน่งนี้', 'SC / CC', ''], d.rows.map(function (r) {

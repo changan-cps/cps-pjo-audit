@@ -82,3 +82,79 @@ API.ois_import = function (u, p) {
     return { added: added, updated: updated, errors: errors };
   });
 };
+
+// ------------------------------------------------------------------ automatic monthly plan from the OIS List
+/**
+ * Builds one plan per working day (Mon–Fri, not a factory holiday) from the active positions of the OIS List, in the same row
+ * shape as the import form, so the person reviews/edits it in the import screen and then imports it.
+ * Order of positions (each position once per round, then a new round):
+ *   1) positions with problems last month (or still-open issues)   2) positions not planned in the last 60 days (2-month coverage)
+ *   3) SC / CC positions   4) the position planned the longest ago.
+ * Person: whoever of the position's people was planned at it the longest ago. Team: the person's team in the employee list,
+ * else the team used the last time that position was planned.
+ */
+var OIS_COVER_DAYS = 60;
+function daysBetween_(a, b) { return Math.round((new Date(b + 'T00:00:00Z') - new Date(a + 'T00:00:00Z')) / 864e5); }
+
+API.plan_generate = function (u, p) {
+  if (!rows_('Workshops').some(function (w) { return w.code === p.workshop; })) throw new RuleError('เลือก Workshop');
+  require_(canCreateAudit(u, p.workshop));
+  if (!/^\d{4}-\d{2}$/.test(p.month || '')) throw new RuleError('ระบุเดือนของแผน');
+  var stations = rows_('OisList').filter(function (r) { return r.workshop === p.workshop && r.active !== 'false'; }).map(oisOut_);
+  if (!stations.length) throw new RuleError('ยังไม่มีข้อมูลใน OIS List ของ ' + p.workshop + ' กรุณาเพิ่มสถานีงานก่อน');
+  var n = daysInMonth_(p.month), hol = holidayMap_(), first = p.month + '-01';
+  var py = Number(p.month.slice(0, 4)), pm = Number(p.month.slice(5, 7)) - 1;
+  var prevMonth = pm ? py + '-' + pad2_(pm) : (py - 1) + '-12';
+  // history of this workshop's plans: last planned date per position and per (position, person), team used last time
+  var last = {}, lastPerson = {}, lastTeam = {}, taken = {};
+  rows_('Plans').filter(function (x) { return x.workshop === p.workshop && x.cancelled !== 'true'; })
+    .sort(function (a, b) { return a.planned_date < b.planned_date ? -1 : 1; }).forEach(function (x) {
+      var st = oisStation_(x.station);
+      if (x.planned_date.slice(0, 7) === p.month) { taken[x.planned_date] = x; }
+      if (x.planned_date.slice(0, 7) <= p.month) {
+        last[st] = x.planned_date; lastPerson[st + '|' + normName_(x.employee_name)] = x.planned_date; if (x.team_name) lastTeam[st] = x.team_name;
+      }
+    });
+  // positions that had problems last month or still have an open issue
+  var problem = {};
+  rows_('Issues').filter(function (i) { return i.workshop === p.workshop && i.station; }).forEach(function (i) {
+    if (i.status !== 'closed' || String(i.created_at).slice(0, 7) === prevMonth) problem[oisStation_(i.station)] = true;
+  });
+  var teamName = {}; rows_('Teams').forEach(function (t) { teamName[t.id] = t.name; });
+  var empByCode = {}; rows_('Employees').forEach(function (e) { empByCode[e.code] = e; });
+  var done = {}, res = { workshop: p.workshop, month: p.month, days: [], generated: 0, kept: 0, no_person: [], no_team: [], stations: stations.length };
+  for (var d = 1; d <= n; d++) {
+    var iso = p.month + '-' + pad2_(d), row = { day: d, team: '', name: '', station: '', level: '', problems: '', note: '' };
+    res.days.push(row);
+    if (taken[iso]) {  // already planned (kept as is so that importing with "replace" does not lose it)
+      var t = taken[iso];
+      row.team = t.team_name; row.name = t.employee_name; row.station = t.station; row.level = t.level; row.note = t.note; row.existing = true; res.kept++;
+      continue;
+    }
+    if (isWeekend_(iso) || hol[iso]) continue;
+    var pool = stations.filter(function (s) { return !done[s.station]; });
+    if (!pool.length) { done = {}; pool = stations.slice(); }
+    function key(s) {
+      var l = last[s.station], overdue = !l || daysBetween_(l, iso) >= OIS_COVER_DAYS;
+      return [problem[s.station] ? 0 : 1, overdue ? 0 : 1, s.sc || s.cc ? 0 : 1, l || '0000-00-00', s.station];
+    }
+    pool.sort(function (a, b) { var x = key(a), y = key(b); for (var i = 0; i < x.length; i++) if (x[i] !== y[i]) return x[i] < y[i] ? -1 : 1; return 0; });
+    var s = pool[0], k = key(s);
+    done[s.station] = true; last[s.station] = iso;
+    var people = s.people.filter(function (x) { var e = x.code ? empByCode[x.code] : null; return !e || e.active !== 'false'; })
+      .sort(function (a, b) { var la = lastPerson[s.station + '|' + normName_(a.name)] || '', lb = lastPerson[s.station + '|' + normName_(b.name)] || ''; return la < lb ? -1 : la > lb ? 1 : 0; });
+    var who = people[0];
+    row.station = s.station; row.name = who ? who.name : '';
+    if (who) {
+      lastPerson[s.station + '|' + normName_(who.name)] = iso;
+      var emp = who.code ? empByCode[who.code] : null;
+      row.team = (emp && emp.team_id && teamName[emp.team_id]) || lastTeam[s.station] || '';
+    } else row.team = lastTeam[s.station] || '';
+    if (!row.name) res.no_person.push(s.station);
+    if (!row.team) res.no_team.push(s.station);
+    row.note = 'สร้างอัตโนมัติ: ' + [problem[s.station] ? 'จุดมีปัญหา' : '', k[1] === 0 && !problem[s.station] ? 'ครบรอบ 2 เดือน' : '', s.sc ? 'SC' : '', s.cc ? 'CC' : ''].filter(Boolean).join(' · ');
+    row.note = row.note.replace(/: $/, '');
+    res.generated++;
+  }
+  return res;
+};
