@@ -329,3 +329,27 @@ test('import: holiday words in the team row count as holidays; GA-FN-05 style po
   const r2 = env.ok('plan_import', env.bsa, { workshop: 'BS', month: '2027-01', dry_run: true, days: [{ day: 4, team: 'วันชัย', name: 'ก', station: 'BS01' }] });
   assert.equal(r2.days[3].team, 'วันชัย');
 });
+
+test('plans whose dates Google Sheets turned into date cells still show on the calendar, people list and deadline', () => {
+  const env = boot();
+  env.sim.setNow('2026-11-20T03:00:00Z');
+  env.ok('plan_import', env.bsa, { workshop: 'BS', month: '2026-10', days: formDays() });
+  env.sim.setNow(null);
+  // what the real sheet did: planned_date / created_at stored as Date cells
+  const sh = env.sim.store.spreadsheets[Object.keys(env.sim.store.spreadsheets)[0]].getSheetByName('Plans');
+  const head = sh.data[0], iDate = head.indexOf('planned_date'), iCreated = head.indexOf('created_at');
+  for (let r = 1; r < sh.data.length; r++) {
+    const d = sh.data[r][iDate];
+    sh.data[r][iDate] = new Date(d + 'T00:00:00+07:00');
+    sh.data[r][iCreated] = new Date(sh.data[r][iCreated]);
+  }
+  env.sim.setNow('2026-11-21T03:00:00Z');
+  const cal = env.ok('calendar', env.bsa, { month: '2026-10', workshop: 'BS' });
+  assert.equal(cal.plans.length, 22);
+  assert.equal(cal.plans[0].planned_date, '2026-10-01');
+  const bs = cal.due_month.rows.find(x => x.workshop === 'BS');
+  assert.equal(bs.submitted, '2026-11-20');
+  const p = env.ok('people', env.bsa, {}).people.find(x => x.code === 'B05');
+  assert.ok(p);
+  env.sim.setNow(null);
+});

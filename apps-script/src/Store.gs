@@ -92,11 +92,21 @@ function rows_(name) {
   for (var i = 0; i < vals.length; i++) {
     if (vals[i][0] === '' || vals[i][0] === null) continue;
     var o = { _row: i + 2 };
-    for (var c = 0; c < cols.length; c++) o[cols[c]] = vals[i][c] === null ? '' : String(vals[i][c]);
+    for (var c = 0; c < cols.length; c++) o[cols[c]] = cellOut_(cols[c], vals[i][c]);
     out.push(o);
   }
   db_._rows[name] = out;
   return out;
+}
+// Google Sheets turns "2026-12-01" / ISO timestamps into date cells when a cell is not plain text.
+// Read them back in the form the app stores: yyyy-MM-dd for *date columns, ISO-8601 for timestamps.
+function cellOut_(col, v) {
+  if (v === null || v === undefined) return '';
+  if (Object.prototype.toString.call(v) === '[object Date]') {
+    if (isNaN(v.getTime())) return '';
+    return /date$/.test(col) ? Utilities.formatDate(v, 'Asia/Bangkok', 'yyyy-MM-dd') : v.toISOString();
+  }
+  return String(v);
 }
 function invalidate_(name) { if (db_._rows) delete db_._rows[name]; }
 
@@ -107,14 +117,15 @@ function find_(name, key, value) {
 }
 
 function insert_(name, obj) {
-  var cols = TABLES[name];
-  sheet_(name).appendRow(cols.map(function (c) { return cell_(obj[c]); }));
+  var cols = TABLES[name], sh = sheet_(name);
+  sh.getRange(sh.getLastRow() + 1, 1, 1, cols.length).setNumberFormat('@');   // keep dates/codes as plain text
+  sh.appendRow(cols.map(function (c) { return cell_(obj[c]); }));
   invalidate_(name);
 }
 
 function update_(name, row, obj) {
   var cols = TABLES[name];
-  sheet_(name).getRange(row._row, 1, 1, cols.length).setValues([cols.map(function (c) {
+  sheet_(name).getRange(row._row, 1, 1, cols.length).setNumberFormat('@').setValues([cols.map(function (c) {
     return cell_(c in obj ? obj[c] : row[c]);
   })]);
   invalidate_(name);
