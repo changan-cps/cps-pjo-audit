@@ -2018,7 +2018,8 @@ function cpsExportSetup() {
 function cpsExportResetKey() { PropertiesService.getScriptProperties().deleteProperty(CPS_KEY_PROP); return cpsExportSetup(); }
 
 /** The app page itself is opened with no parameters; any call with parameters (or a POST) is a CPS/API call. */
-function isCpsRequest_(e) { var p = (e && e.parameter) || {}; return Object.keys(p).length > 0; }
+// A request with parameters is a CPS System pull — except the portal's sign-in ticket (?sso=…), which opens the app.
+function isCpsRequest_(e) { var p = (e && e.parameter) || {}; return Object.keys(p).filter(function (k) { return k !== 'sso'; }).length > 0; }
 
 function doPost(e) {
   var p = {};

@@ -84,3 +84,11 @@ test('the page boots through the SSO path', () => {
   assert.ok(html.includes("PJO.call('sso_login'"));
   assert.ok(html.includes('google.script.url.getLocation'));
 });
+
+test('opening /exec?sso=<ticket> serves the app, not the CPS export API', () => {
+  const { sim } = boot();
+  const page = sim.ctx.doGet({ parameter: { sso: ticket() } });
+  assert.ok(page.getContent().includes("PJO.call('sso_login'"), 'app shell is served');
+  assert.equal(sim.get({ key: 'x' }).body.ok, false, 'other parameters still reach the export API');
+  assert.equal(sim.get({ sso: 'a.b', key: 'x' }).body.ok, false);
+});
