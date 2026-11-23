@@ -2472,8 +2472,25 @@ PJO.mountAudit = function (B) {
   function isAdmin() { return S.user && S.user.is_admin; }
 
   // ---------------------------------------------------------------- login / shell
+  // Portal-only mode: no username/PIN form, just the way back to the CPS Digital Platform.
+  function ssoPage(msg, info) {
+    app.textContent = '';
+    app.append(h('div', { class: 'login' }, h('div', { class: 'card', style: 'width:min(380px,100%);text-align:center' },
+      h('h1', { text: 'CPS PJO Audit' }),
+      h('p', { class: 'muted', text: 'เข้าใช้งานผ่าน CPS Digital Platform เท่านั้น · 请通过 CPS Digital Platform 进入' }),
+      msg ? h('div', { class: 'notice err', text: msg }) : null,
+      h('a', { class: 'btn primary', style: 'display:block;margin-top:12px;text-decoration:none', href: info.launcher, target: '_top' }, 'เข้าสู่ระบบอีกครั้ง · Sign in again'),
+      h('a', { class: 'btn', style: 'display:block;margin-top:8px;text-decoration:none', href: info.portal, target: '_top' }, 'CPS Digital Platform'))));
+  }
   function loginPage(msg) {
     app.textContent = '';
+    if (!loginPage.asked) {          // ask the server once whether the PIN form is allowed
+      app.append(h('div', { class: 'loading', text: 'กำลังเปิดระบบ…' }));
+      PJO.call('ping', {}).then(function (r) { loginPage.asked = true; loginPage.sso = r.ok && r.data.sso_only ? r.data : null; loginPage(msg); },
+        function () { loginPage.asked = true; loginPage(msg); });
+      return;
+    }
+    if (loginPage.sso) { ssoPage(msg, loginPage.sso); return; }
     var f = h('form', { class: 'card', style: 'width:min(380px,100%)' },
       h('h1', { text: 'CPS PJO Audit' }), h('p', { class: 'muted', text: 'Standardized Work → PJO · Changan Rayong' }),
       msg ? h('div', { class: 'notice err', text: msg }) : null,
@@ -2525,6 +2542,22 @@ PJO.mountAudit = function (B) {
     document.querySelectorAll('#nav a').forEach(function (a) { a.classList.toggle('on', a.dataset.r === r); });
   }
 
+  // Opened from the portal with ?sso=<ticket>: trade the ticket for a session, then start as usual.
+  function ssoTicket(cb) {
+    try { google.script.url.getLocation(function (loc) { cb(loc && loc.parameter && loc.parameter.sso || ''); }); } catch (e) { cb(''); }
+  }
+  function boot() {
+    ssoTicket(function (ticket) {
+      if (!ticket) { start(); return; }
+      app.textContent = ''; app.append(h('div', { class: 'loading', text: 'กำลังเข้าสู่ระบบ…' }));
+      PJO.call('sso_login', { ticket: ticket }).then(function (r) {
+        try { google.script.history.replace(null, {}, location.hash.replace(/^#/, '')); } catch (e) { /* cosmetic only */ }
+        if (r.ok) { PJO.store.set('pjo-token', r.data.token); start(); }
+        else if (PJO.store.get('pjo-token')) start();                 // stale ticket (e.g. page refresh) but still signed in
+        else loginPage(r.data.message);
+      }, function () { start(); });
+    });
+  }
   function start() {
     if (!PJO.store.get('pjo-token')) { loginPage(); return; }
     PJO.call('me', {}).then(function (r) {
@@ -3148,7 +3181,7 @@ PJO.mountAudit = function (B) {
     });
   }
 
-  start();
+  boot();
 })();
 </script>
 

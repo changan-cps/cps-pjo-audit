@@ -10,6 +10,7 @@ var SESSION_SECONDS = 6 * 60 * 60;
 function hashPin_(salt, pin) { return sha256_(salt + ':' + pin); }
 
 function login_(username, pin) {
+  if (ssoOnly_()) throw new RuleError('เข้าใช้งานผ่าน CPS Digital Platform เท่านั้น', 'sso_only');
   username = String(username || '').trim().toLowerCase();
   var cache = CacheService.getScriptCache();
   var failKey = 'fail:' + username;
@@ -94,4 +95,61 @@ function randomPin_() {
   var s = '';
   for (var i = 0; i < 6; i++) s += Math.floor(Math.random() * 10);
   return s;
+}
+
+// =====================================================================================
+// CPS SSO – sign-in from the CPS Digital Platform portal (https://changan-cps.github.io/cps-portal/)
+// The portal's SSO service issues a 2-minute ticket signed with a shared secret:
+//   base64url(JSON {t:'k', u, n, app, role, exp, jti}) + "." + base64url(HMAC-SHA256(part1, SSO_SECRET))
+// Script property SSO_SECRET   = the secret printed by showSecret() in the CPS SSO script.
+// Script property ALLOW_LOCAL_LOGIN = 'true' re-enables the username + PIN form (emergency only).
+// Who may enter, and with which role, is decided in the portal: the role in the ticket is applied here.
+// =====================================================================================
+var SSO_APP_ID = 'cps-pjo-audit';
+var SSO_PORTAL_URL = 'https://changan-cps.github.io/cps-portal/';
+var SSO_LAUNCHER_URL = 'https://changan-cps.github.io/cps-pjo-audit/';
+
+function ssoSecret_() { return String(PropertiesService.getScriptProperties().getProperty('SSO_SECRET') || '').trim(); }
+/** True when the portal is the only way in (secret configured and the PIN form not explicitly re-enabled). */
+function ssoOnly_() { return !!ssoSecret_() && PropertiesService.getScriptProperties().getProperty('ALLOW_LOCAL_LOGIN') !== 'true'; }
+
+function ssoVerify_(ticket) {
+  var secret = ssoSecret_();
+  if (!secret) throw new RuleError('ระบบนี้ยังไม่ได้เชื่อมกับ CPS Digital Platform', 'sso_off');
+  var m = /^([\w-]+)\.([\w-]+)$/.exec(String(ticket || ''));
+  var bad = new RuleError('บัตรผ่านไม่ถูกต้องหรือหมดอายุ กรุณาเปิดจาก CPS Digital Platform อีกครั้ง', 'sso_bad');
+  if (!m) throw bad;
+  var sig = Utilities.base64EncodeWebSafe(Utilities.computeHmacSha256Signature(m[1], secret)).replace(/=+$/, '');
+  if (sig !== m[2]) throw bad;
+  var t;
+  try { t = JSON.parse(Utilities.newBlob(Utilities.base64DecodeWebSafe(m[1] + '==='.slice((m[1].length + 3) % 4))).getDataAsString()); } catch (e) { throw bad; }
+  if (!t || t.t !== 'k' || t.app !== SSO_APP_ID || !(t.exp > Date.now()) || !t.u || !t.jti) throw bad;
+  var cache = CacheService.getScriptCache();
+  if (cache.get('jti:' + t.jti)) throw bad;                       // each ticket works once
+  cache.put('jti:' + t.jti, '1', 600);
+  return t;
+}
+
+function ssoLogin_(ticket) {
+  var t = ssoVerify_(ticket);
+  var username = String(t.u).trim().toLowerCase();
+  var role = ROLES.indexOf(t.role) >= 0 ? t.role : 'viewer';
+  var name = String(t.n || username).slice(0, 80);
+  withLock(function () {
+    var row = find_('Users', 'username', username);
+    if (!row) {
+      insert_('Users', newUserRow_(username, name, randomPin_() + randomPin_(), [{ role: role, workshop: 'ALL' }], false));
+    } else {
+      var cur = [];
+      try { cur = JSON.parse(row.roles || '[]'); } catch (e) { cur = []; }
+      // same role as the portal says: keep any per-workshop detail set here; otherwise the portal wins
+      var same = cur.length && cur.every(function (r) { return r.role === role; });
+      update_('Users', row, { name: name, roles: same ? row.roles : JSON.stringify([{ role: role, workshop: 'ALL' }]), active: 'true', must_change_pin: 'false' });
+    }
+  });
+  var u = find_('Users', 'username', username);
+  var token = uuid_() + uuid_().slice(0, 8);
+  CacheService.getScriptCache().put('s:' + token, username, SESSION_SECONDS);
+  trail({ username: username }, 'sso_login', '', '', { role: role });
+  return { token: token, user: publicUser_(userObj_(u)) };
 }

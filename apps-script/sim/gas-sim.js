@@ -129,7 +129,10 @@ function createSim(srcDir, opts) {
       },
       base64Decode: s => toSigned(Buffer.from(s, 'base64')),
       base64Encode: bytes => toBuf(bytes).toString('base64'),
-      newBlob: (bytes, mime, name) => ({ bytes, mime, name }),
+      base64EncodeWebSafe: bytes => toBuf(bytes).toString('base64').replace(/\+/g, '-').replace(/\//g, '_'),
+      base64DecodeWebSafe: s => toSigned(Buffer.from(String(s).replace(/-/g, '+').replace(/_/g, '/'), 'base64')),
+      computeHmacSha256Signature: (value, key) => toSigned(crypto.createHmac('sha256', Buffer.from(String(key), 'utf8')).update(Buffer.from(String(value), 'utf8')).digest()),
+      newBlob: (bytes, mime, name) => ({ bytes, mime, name, getBytes: () => bytes, getDataAsString: () => (Array.isArray(bytes) ? toBuf(bytes).toString('utf8') : String(bytes)) }),
       formatDate(d, tz, fmt) {
         const parts = Object.fromEntries(new Intl.DateTimeFormat('en-GB', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit',
           hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' }).formatToParts(d).map(p => [p.type, p.value]));

@@ -43,6 +43,8 @@
     <a class="ghost" id="direct" target="_blank" rel="noopener">เปิดในเบราว์เซอร์</a>
   </div>
 </div>
+<!-- CPS SSO: only people signed in to the CPS Digital Platform (with access to this app) get a ticket -->
+<script src="/cps-portal/sso-gate.js" data-app="cps-pjo-audit" data-ticket></script>
 <script src="config.js"></script>
 <script>
 (function () {
@@ -57,10 +59,15 @@
   }
   document.getElementById('direct').href = url;
   document.getElementById('retry').onclick = function () { location.reload(); };
-  if (window.PJO_MODE === 'open') { location.replace(url); return; }
+  function withTicket(cb) {     // wait for sso-gate.js (it redirects to the portal by itself when nobody is signed in)
+    function go() { var t = window.CPS_SSO && window.CPS_SSO.ticket; cb(t ? url + (url.indexOf('?') < 0 ? '?' : '&') + 'sso=' + encodeURIComponent(t) : url); }
+    if (window.CPS_SSO || !document.querySelector('script[data-ticket]')) go(); else document.addEventListener('cps-sso', go);
+  }
+  if (window.PJO_MODE === 'open') { withTicket(function (u) { location.replace(u); }); return; }
   if (!navigator.onLine) { problem('ไม่มีสัญญาณอินเทอร์เน็ต เชื่อมต่อแล้วกด "ลองใหม่"'); return; }
   var f = document.createElement('iframe');
-  f.id = 'app'; f.title = 'CPS PJO Audit'; f.src = url;
+  f.id = 'app'; f.title = 'CPS PJO Audit';
+  withTicket(function (u) { f.src = u; });
   f.allow = 'camera; clipboard-write; fullscreen';
   var loaded = false;
   f.onload = function () { loaded = true; splash.classList.add('hide'); };

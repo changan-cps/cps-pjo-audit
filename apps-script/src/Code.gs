@@ -28,7 +28,7 @@ function api(name, token, payload) {
   try {
     var fn = API[name];
     if (!fn) throw new RuleError('ไม่รู้จักคำสั่ง ' + name);
-    var user = (name === 'login' || name === 'ping') ? null : requireSession(token);
+    var user = (name === 'login' || name === 'ping' || name === 'sso_login') ? null : requireSession(token);
     if (user && user.must_change_pin && name !== 'change_pin' && name !== 'me') throw new RuleError('กรุณาตั้ง PIN ใหม่ก่อนใช้งาน', 'must_change_pin');
     var data = fn(user, payload || {}, token);
     return JSON.stringify({ ok: true, data: data === undefined ? null : data });

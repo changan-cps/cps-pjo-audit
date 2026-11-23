@@ -2,7 +2,8 @@
 var API = {};
 
 // ----------------------------------------------------------------- session
-API.ping = function () { return { ok: true, now: Date.now() }; };
+API.ping = function () { return { ok: true, now: Date.now(), sso_only: ssoOnly_(), portal: SSO_PORTAL_URL, launcher: SSO_LAUNCHER_URL }; };
+API.sso_login = function (_, p) { return ssoLogin_(p.ticket); };
 API.login = function (_, p) { return login_(p.username, p.pin); };
 API.logout = function (u, p, token) { logout_(token); return {}; };
 API.me = function (u) { return { user: publicUser_(u), gbr: settingGet('gbr_mapping'), workshops: workshopList_(u) }; };
