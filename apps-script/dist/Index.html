@@ -381,6 +381,13 @@ a.btn { color: var(--ink); } a.btn.primary { color:#fff; }
 .today-list{display:grid;gap:8px}
 .today-item{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;border:1px solid var(--line, #d5dce6);border-radius:10px}
 .today-item .btn{white-space:nowrap}
+.due-card { border-left: 4px solid #5b6573; }
+.due-card.due-over { border-left-color: #b42318; background: #fff8f7; }
+.due-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+.due-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.due-chip { display: inline-block; padding: 4px 10px; border-radius: 99px; font-size: 13px; color: var(--c); background: var(--cb); border: 1px solid var(--c); }
+.due-chip.c-red { font-weight: 700; }
+.due-sub { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line-2); display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 </style>
 
 </head>
@@ -2608,6 +2615,8 @@ PJO.mountAudit = function (B) {
       main.textContent = '';
       main.append(pagehead('Dashboard', 'ข้อมูลจริงจากการตรวจในระบบ ไม่มีคะแนนรวม PJO', h('a', { class: 'btn primary', href: '#/start' }, '+ เริ่มตรวจ PJO')),
         wsFilter(p.workshop, function (e) { go('#/dashboard' + qs({ workshop: e.target.value })); }),
+        d.plan_due && d.plan_due.counts.overdue ? h('div', { class: 'notice err', style: 'margin-bottom:12px' }, '🔴 Overdue: ยังไม่นำเข้าแผนเดือน' + monthTh(d.plan_due.month) + ' (กำหนด ' + PJO.fmtDate(d.plan_due.due) + ') — ',
+          d.plan_due.rows.filter(function (r) { return r.state === 'overdue'; }).map(function (r) { return r.name; }).join(', '), ' ', h('a', { href: '#/' }, 'ไปที่ปฏิทิน')) : null,
         h('h2', { text: 'แผนตรวจเดือนนี้' }),
         h('div', { class: 'tiles' },
           d.plan_total ? tile(d.plan_done + ' / ' + d.plan_total, 'ตรวจและลงนามครบ / แผน', '#/plans') : tile('–', 'ยังไม่มีแผนตรวจเดือนนี้ จึงไม่คำนวณความสำเร็จตามแผน'),
@@ -2775,10 +2784,36 @@ PJO.mountAudit = function (B) {
               h('span', { class: 'pchip-st2', text: pl.state.label + (pl.state.timing && pl.state.timing.minutes !== undefined ? ' · ' + pl.state.timing.start_hm + '–' + pl.state.timing.end_hm : '') }));
           })));
       }
+      main.append(planDuePanel(d.due_next, d.due_month, month, d.is_admin));
       if (month === d.today.slice(0, 7)) main.append(todayPanel(d.plans.filter(function (pl) { return pl.planned_date === d.today; })));
       if (!d.plans.length) main.append(h('div', { class: 'notice info', style: 'margin-bottom:12px' }, 'ยังไม่มีแผนตรวจเดือนนี้ — กด "นำเข้าแผน (Excel / PDF)" เพื่อนำเข้าแบบฟอร์มแผนงานรายเดือน'));
       main.append(grid);
     });
+  }
+
+  // ---------------------------------------------------------------- plan import deadline (the 25th)
+  function dueChip(r) {
+    var txt = r.state === 'done' ? '✅ ' + r.name + ' · นำเข้าแล้ว ' + PJO.fmtDate(r.submitted)
+      : r.state === 'late' ? '⚠️ ' + r.name + ' · นำเข้าช้า ' + r.days_late + ' วัน (' + PJO.fmtDate(r.submitted) + ')'
+      : r.state === 'overdue' ? '🔴 ' + r.name + ' · Overdue เลยกำหนด ' + r.days_late + ' วัน'
+      : '⏳ ' + r.name + ' · รอนำเข้า (เหลือ ' + r.days_left + ' วัน)';
+    return h('span', { class: 'due-chip c-' + r.color, text: txt });
+  }
+  function planDuePanel(next, cur, month, admin) {
+    var over = next.counts.overdue || 0;
+    var card = h('div', { class: 'card due-card' + (over ? ' due-over' : '') },
+      h('div', { class: 'due-head' }, h('h2', { style: 'margin:0', text: '📥 นำเข้าแผนเดือน' + monthTh(next.month) + ' ภายใน ' + PJO.fmtDate(next.due) }),
+        admin ? h('button', { type: 'button', class: 'btn small', onclick: dueDayDialog.bind(null, next.due_day) }, 'ตั้งวันกำหนดส่ง') : null),
+      h('div', { class: 'due-chips' }, next.rows.map(dueChip)));
+    var bad = cur.month !== next.month ? cur.rows.filter(function (r) { return r.state === 'late' || r.state === 'overdue'; }) : [];
+    if (bad.length) card.append(h('div', { class: 'due-sub' }, h('b', { text: 'แผนเดือน' + monthTh(month) + ' (กำหนด ' + PJO.fmtDate(cur.due) + '): ' }), h('span', { class: 'due-chips' }, bad.map(dueChip))));
+    return card;
+  }
+  function dueDayDialog(day) {
+    var body = h('div', null, inp('due_day', 'นำเข้าแผนเดือนถัดไปภายในวันที่ (1–28) ของเดือนก่อนหน้า', 'number', String(day)));
+    var save = h('button', { type: 'button', class: 'btn primary' }, 'บันทึก');
+    var dlg = PJO.modal('วันกำหนดนำเข้าแผน', body, [h('button', { type: 'button', class: 'btn', onclick: function () { dlg.close(); } }, 'ยกเลิก'), save]);
+    save.addEventListener('click', function () { PJO.get('plan_due_save', { day: val('due_day') }).then(function () { dlg.close(); PJO.toast('บันทึกแล้ว'); PJO.route(); }); });
   }
 
   // ---------------------------------------------------------------- today's audits (top of the calendar)

@@ -260,3 +260,43 @@ test('people: one row per person from plans and audits, workshop-scoped, with hi
   assert.equal(d.plans.length, 1);
   assert.equal(env.sim.api('person', env.gaa, { key: 'c:B05' }).ok, false);
 });
+
+test('plan import deadline: next month due on the 25th; not imported after it = red overdue', () => {
+  const env = boot();
+  const due = (when, month) => { env.sim.setNow(when); return env.ok('calendar', env.bsa, { month: month || '2026-10', workshop: 'BS' }); };
+  // 20 Sep: October plan not imported yet, 5 days left
+  let r = due('2026-09-20T03:00:00Z').due_next;
+  assert.equal(r.month, '2026-10'); assert.equal(r.due, '2026-09-25');
+  let bs = r.rows.find(x => x.workshop === 'BS');
+  assert.deepEqual([bs.state, bs.color, bs.days_left], ['waiting', 'grey', 5]);
+  // 25 Sep (deadline day, Bangkok time) is still on time
+  assert.equal(due('2026-09-25T16:00:00Z').due_next.rows.find(x => x.workshop === 'BS').state, 'waiting');
+  // 27 Sep: overdue, red, 2 days late
+  bs = due('2026-09-27T03:00:00Z').due_next.rows.find(x => x.workshop === 'BS');
+  assert.deepEqual([bs.state, bs.color, bs.label, bs.days_late], ['overdue', 'red', 'Overdue', 2]);
+  // the auditor only sees workshops they may see
+  assert.deepEqual(env.ok('calendar', env.bsa, { month: '2026-10' }).due_next.rows.map(x => x.workshop), ['BS']);
+  // importing on 28 Sep → late (amber), shown again when viewing October
+  env.sim.setNow('2026-09-28T05:00:00Z');
+  env.ok('plan_import', env.bsa, { workshop: 'BS', month: '2026-10', days: formDays() });
+  bs = due('2026-09-28T05:00:00Z').due_next.rows.find(x => x.workshop === 'BS');
+  assert.deepEqual([bs.state, bs.submitted, bs.days_late, bs.plans], ['late', '2026-09-28', 3, 22]);
+  const oct = due('2026-10-02T03:00:00Z', '2026-10');
+  assert.equal(oct.due_month.rows.find(x => x.workshop === 'BS').state, 'late');
+  assert.equal(oct.due_next.month, '2026-11');
+  // on time: November plan imported on 20 Oct
+  env.sim.setNow('2026-10-20T03:00:00Z');
+  env.ok('plan_save', env.bsa, { workshop: 'BS', planned_date: '2026-11-02', team_name: 'FA1', employee_name: 'X', station: 'FA07' });
+  bs = due('2026-10-30T03:00:00Z').due_next.rows.find(x => x.workshop === 'BS');
+  assert.deepEqual([bs.state, bs.color], ['done', 'green']);
+  // dashboard flags overdue workshops; admin can move the deadline day
+  env.sim.setNow('2026-11-27T03:00:00Z');
+  const dash = env.ok('dashboard', env.bsa, {});
+  assert.equal(dash.plan_due.month, '2026-12');
+  assert.equal(dash.plan_due.counts.overdue, 1);
+  assert.equal(env.sim.api('plan_due_save', env.bsa, { day: 28 }).code, 'forbidden');
+  env.ok('plan_due_save', env.admin, { day: 28 });
+  assert.equal(env.ok('dashboard', env.bsa, {}).plan_due.rows[0].state, 'waiting');
+  assert.equal(env.sim.api('plan_due_save', env.admin, { day: 31 }).ok, false);
+  env.sim.setNow(null);
+});

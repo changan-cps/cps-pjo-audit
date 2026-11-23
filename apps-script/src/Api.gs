@@ -48,6 +48,7 @@ API.dashboard = function (u, p) {
   var issues = rows_('Issues').filter(function (i) { return vis.indexOf(i.workshop) >= 0; });
   var today = todayBkk(), month = today.slice(0, 7);
   var plans = rows_('Plans').filter(function (x) { return vis.indexOf(x.workshop) >= 0 && x.cancelled !== 'true' && x.planned_date.slice(0, 7) === month; });
+  var planDue = planSubmission_(vis, monthShift_(month, 1), today);
   var planDone = plans.filter(function (pl) { return audits.some(function (a) { return a.plan_id === pl.id && a.status === 'completed'; }); }).length;
   var major = 0, minor = 0, byItem = {}, fuOpen = 0, fuTrained = 0;
   audits.forEach(function (ai) {
@@ -63,7 +64,7 @@ API.dashboard = function (u, p) {
     a.followups.forEach(function (f) { if (f.stage === 'open') fuOpen++; else if (f.stage === 'trained') fuTrained++; });
   });
   var open = issues.filter(function (i) { return i.status !== 'closed'; });
-  return {
+  return { plan_due: planDue,
     plan_total: plans.length, plan_done: planDone,
     in_progress: audits.filter(function (a) { return a.status === 'draft' || a.status === 'in_progress'; }).length,
     pending_sig: audits.filter(function (a) { return a.status === 'pending_signatures' || a.status === 'amended'; }).length,

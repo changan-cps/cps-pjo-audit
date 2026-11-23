@@ -97,6 +97,7 @@ API.calendar = function (u, p) {
   var summary = {};
   plans.forEach(function (pl) { summary[pl.state.code] = (summary[pl.state.code] || 0) + 1; });
   return { month: month, today: today, window: win, plans: plans, summary: summary, statuses: PLAN_STATUS,
+           due_next: planSubmission_(vis, monthShift_(today.slice(0, 7), 1), today), due_month: planSubmission_(vis, month, today),
            holidays: holidays_().filter(function (h) { return h.date.slice(0, 7) === month; }),
            can_plan: vis.filter(function (w) { return canCreateAudit(u, w); }), can_holiday: canPlanAny_(u), is_admin: isAdmin(u) };
 };
@@ -311,4 +312,48 @@ API.plan_import = function (u, p) {
     trail(u, 'plan.import', '', '', { workshop: p.workshop, month: p.month, created: created, replaced: replaced, kept: kept, source: p.source || '' });
     return { created: created, replaced: replaced, kept: kept, batch_id: batch };
   });
+};
+
+// =====================================================================================
+// Plan import deadline: next month's plan must be in the system by the 25th (setting plan_due_day).
+//   done    – imported on or before the deadline        late    – imported after the deadline
+//   waiting – not imported yet, deadline not passed     overdue – not imported and the deadline has passed (red)
+// "Imported" = the first plan row created for that workshop + month (import or manual entry).
+// =====================================================================================
+var PLAN_DUE_DAY_DEFAULT = 25;
+var PLAN_DUE_STATUS = {
+  done: { label: 'นำเข้าแล้ว', color: 'green' }, late: { label: 'นำเข้าช้า', color: 'amber' },
+  waiting: { label: 'รอนำเข้า', color: 'grey' }, overdue: { label: 'Overdue', color: 'red' }
+};
+function planDueDay_() { var d = Number(settingGet('plan_due_day')); return d >= 1 && d <= 28 ? d : PLAN_DUE_DAY_DEFAULT; }
+function monthShift_(m, n) { var p = m.split('-').map(Number), d = new Date(Date.UTC(p[0], p[1] - 1 + n, 1)); return d.toISOString().slice(0, 7); }
+function planDueDate_(month) { var d = planDueDay_(); return monthShift_(month, -1) + '-' + (d < 10 ? '0' : '') + d; }
+function bkkDay_(iso) { return iso ? Utilities.formatDate(new Date(iso), 'Asia/Bangkok', 'yyyy-MM-dd') : ''; }
+function daysBetween_(a, b) { return Math.round((Date.parse(b + 'T00:00:00Z') - Date.parse(a + 'T00:00:00Z')) / 86400000); }
+function planSubmission_(vis, month, today) {
+  var due = planDueDate_(month), first = {}, count = {};
+  rows_('Plans').forEach(function (pl) {
+    if (pl.planned_date.slice(0, 7) !== month || vis.indexOf(pl.workshop) < 0) return;
+    var day = bkkDay_(pl.created_at);
+    if (day && (!first[pl.workshop] || day < first[pl.workshop])) first[pl.workshop] = day;
+    if (pl.cancelled !== 'true') count[pl.workshop] = (count[pl.workshop] || 0) + 1;
+  });
+  var rows = rows_('Workshops').filter(function (w) { return vis.indexOf(w.code) >= 0 && w.active !== 'false'; }).map(function (w) {
+    var sub = first[w.code] || '', code;
+    if (sub) code = sub <= due ? 'done' : 'late';
+    else code = today <= due ? 'waiting' : 'overdue';
+    return { workshop: w.code, name: w.name, state: code, label: PLAN_DUE_STATUS[code].label, color: PLAN_DUE_STATUS[code].color,
+             submitted: sub, plans: count[w.code] || 0, days_late: sub ? Math.max(0, daysBetween_(due, sub)) : Math.max(0, daysBetween_(due, today)),
+             days_left: sub ? 0 : Math.max(0, daysBetween_(today, due)) };
+  });
+  var n = {}; rows.forEach(function (r) { n[r.state] = (n[r.state] || 0) + 1; });
+  return { month: month, due: due, due_day: planDueDay_(), rows: rows, counts: n };
+}
+API.plan_due_save = function (u, p) {
+  require_(isAdmin(u));
+  var d = Number(p.day);
+  if (!(d >= 1 && d <= 28)) throw new RuleError('วันกำหนดส่งแผนต้องอยู่ระหว่าง 1–28');
+  withLock(function () { settingPut('plan_due_day', d, u.username); });
+  trail(u, 'settings.plan_due_day', '', '', { day: d });
+  return { day: d };
 };

@@ -374,4 +374,11 @@ a.btn { color: var(--ink); } a.btn.primary { color:#fff; }
 .today-list{display:grid;gap:8px}
 .today-item{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;border:1px solid var(--line, #d5dce6);border-radius:10px}
 .today-item .btn{white-space:nowrap}
+.due-card { border-left: 4px solid #5b6573; }
+.due-card.due-over { border-left-color: #b42318; background: #fff8f7; }
+.due-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+.due-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.due-chip { display: inline-block; padding: 4px 10px; border-radius: 99px; font-size: 13px; color: var(--c); background: var(--cb); border: 1px solid var(--c); }
+.due-chip.c-red { font-weight: 700; }
+.due-sub { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line-2); display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 </style>
