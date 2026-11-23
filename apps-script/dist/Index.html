@@ -2528,13 +2528,13 @@ PJO.mountAudit = function (B) {
     });
   }
 
-  var NAV = [['#/', '1. ปฏิทินแผนตรวจ'], ['#/plans', '2. แผนตรวจ / นำเข้าแผน'], ['#/standards', '3. แม่แบบและมาตรฐาน'], ['#/people', '4. รายการตรวจรายบุคคล'],
-    ['#/issues', '5. ปัญหาที่ต้องตามต่อ'], ['#/start', 'เริ่มตรวจ (นอกแผน)'], ['#/signatures', 'รายการรอลงนาม'], ['#/dashboard', 'Dashboard'], ['#/reports', 'รายงานและ Export']];
+  var NAV = [['#/', '📅 ปฏิทินแผนตรวจ'], ['#/plans', '📥 แผนตรวจ / นำเข้าแผน'], ['#/standards', '📘 แม่แบบและมาตรฐาน'], ['#/people', '👥 รายการตรวจรายบุคคล'],
+    ['#/issues', '⚠️ ปัญหาที่ต้องตามต่อ'], ['#/start', '📝 เริ่มตรวจ (นอกแผน)'], ['#/signatures', '✍️ รายการรอลงนาม'], ['#/dashboard', '📊 Dashboard'], ['#/reports', '📄 รายงานและ Export']];
   function shell() {
     app.textContent = '';
     var side = h('aside', { class: 'side', onclick: function (e) { if (e.target.tagName === 'A') side.classList.remove('open'); } },
       h('div', { class: 'brandmark' }, 'CPS PJO Audit', h('small', { text: 'Standardized Work → PJO' })),
-      h('nav', { id: 'nav' }, NAV.concat(isAdmin() ? [['#/admin', 'ผู้ใช้และข้อมูลหลัก']] : []).map(function (n) { return h('a', { href: n[0], dataset: { r: n[0] }, text: n[1] }); })),
+      h('nav', { id: 'nav' }, NAV.concat(isAdmin() ? [['#/admin', '⚙️ ผู้ใช้และข้อมูลหลัก']] : []).map(function (n) { return h('a', { href: n[0], dataset: { r: n[0] }, text: n[1] }); })),
       h('div', { class: 'who' }, h('b', { text: S.user.name }), (S.user.roles || []).map(function (r) { return ROLE_TH[r.role] + (r.workshop === 'ALL' ? '' : ' ' + r.workshop); }).join(', ') || 'ยังไม่มีบทบาท',
         h('div', { class: 'btnrow', style: 'margin-top:8px' },
           h('button', { class: 'btn small', type: 'button', onclick: function () { pinPage(false); } }, 'เปลี่ยน PIN'),
