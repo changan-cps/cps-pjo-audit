@@ -237,3 +237,26 @@ test('CPS export: key required, full standard-form data, since/ack, then retenti
   assert.match(env.sim.page(), /CPS PJO Audit/);
   env.sim.setNow(null);
 });
+
+test('people: one row per person from plans and audits, workshop-scoped, with history', () => {
+  const env = boot();
+  env.ok('plan_import', env.bsa, { workshop: 'BS', month: '2026-10', days: formDays() });
+  const plans = env.ok('calendar', env.bsa, { month: '2026-10', workshop: 'BS' }).plans;
+  const p5 = plans.find(x => x.planned_date === '2026-10-05');
+  const { id } = env.ok('plan_start', env.bsa, { plan_id: p5.id });
+  const list = env.ok('people', env.bsa, {}).people;
+  assert.equal(list.length, 22);
+  const b05 = list.find(r => r.code === 'B05');
+  assert.equal(b05.name, 'พนักงาน 5');
+  assert.equal(b05.audits, 1);
+  assert.deepEqual(b05.stations, ['EH04']);
+  assert.equal(b05.key, 'c:B05');
+  const noCode = list.find(r => r.name === 'พนักงาน 12');
+  assert.match(noCode.key, /^n:BS:/);
+  assert.equal(env.ok('people', env.bsa, { q: 'EH04' }).people.length, 1);
+  assert.equal(env.ok('people', env.gaa, {}).people.length, 0, 'GA auditor cannot see Body Shop people');
+  const d = env.ok('person', env.bsa, { key: 'c:B05' });
+  assert.deepEqual(d.audits.map(a => a.id), [String(id)]);
+  assert.equal(d.plans.length, 1);
+  assert.equal(env.sim.api('person', env.gaa, { key: 'c:B05' }).ok, false);
+});

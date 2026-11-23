@@ -1565,6 +1565,73 @@ API.admin_employee_link = function (u, p) {
   });
 };
 
+// ----------------------------------------------------------------- people: audit history per person
+// One row per person who was planned or audited (matched by employee code, otherwise by name within the workshop).
+function personKey_(workshop, code, name) { return code ? 'c:' + code : (normName_(name) ? 'n:' + workshop + ':' + normName_(name) : ''); }
+function peopleIndex_(u, workshop) {
+  var vis = visibleWorkshops(u).filter(function (w) { return !workshop || w === workshop; });
+  var teams = {}; rows_('Teams').forEach(function (t) { teams[t.id] = t.name; });
+  var out = {}, auditKey = {};
+  function rec(ws, code, name, team, station) {
+    var k = personKey_(ws, code, name);
+    if (!k) return null;
+    var r = out[k] || (out[k] = { key: k, code: code || '', name: name || '', workshop: ws, team: '', stations: [], audits: 0, completed: 0,
+      last_date: '', last_status: '', last_status_th: '', next_plan: '', open_issues: 0 });
+    if (!r.name && name) r.name = name;
+    if (!r.code && code) r.code = code;
+    if (team && !r.team) r.team = team;
+    if (station && r.stations.indexOf(station) < 0) r.stations.push(station);
+    return r;
+  }
+  rows_('Audits').forEach(function (a) {
+    if (vis.indexOf(a.workshop) < 0 || a.status === 'cancelled') return;
+    var r = rec(a.workshop, a.employee_code, a.employee_name, teams[a.team_id], a.station);
+    if (!r) return;
+    auditKey[a.id] = r.key;
+    r.audits++;
+    if (a.status === 'completed') r.completed++;
+    if (a.audit_date >= r.last_date) { r.last_date = a.audit_date; r.last_status = a.status; r.last_status_th = AUDIT_STATUS_TH[a.status] || a.status; }
+  });
+  var today = todayBkk();
+  rows_('Plans').forEach(function (pl) {
+    if (vis.indexOf(pl.workshop) < 0 || pl.cancelled === 'true') return;
+    var r = rec(pl.workshop, pl.employee_code, pl.employee_name, pl.team_name || teams[pl.team_id], pl.station);
+    if (r && pl.planned_date >= today && (!r.next_plan || pl.planned_date < r.next_plan)) r.next_plan = pl.planned_date;
+  });
+  rows_('Issues').forEach(function (i) {
+    if (i.status === 'closed') return;
+    var seen = {};
+    String(i.audit_ids || i.audit_id || '').split(',').forEach(function (id) {
+      var k = auditKey[id.trim()];
+      if (k && !seen[k]) { seen[k] = true; out[k].open_issues++; }
+    });
+  });
+  return { people: out, auditKey: auditKey, vis: vis };
+}
+API.people = function (u, p) {
+  var idx = peopleIndex_(u, p.workshop), q = String(p.q || '').toLowerCase().trim();
+  var list = Object.keys(idx.people).map(function (k) { return idx.people[k]; }).filter(function (r) {
+    return !q || (r.name + ' ' + r.code + ' ' + r.team + ' ' + r.stations.join(' ')).toLowerCase().indexOf(q) >= 0;
+  }).sort(function (a, b) { return a.workshop === b.workshop ? (a.name < b.name ? -1 : 1) : (a.workshop < b.workshop ? -1 : 1); });
+  return { people: list };
+};
+API.person = function (u, p) {
+  var idx = peopleIndex_(u, ''), r = idx.people[p.key];
+  if (!r) throw new RuleError('ไม่พบข้อมูลพนักงานคนนี้ หรือไม่มีสิทธิ์ดู Workshop นี้');
+  var audits = rows_('Audits').filter(function (a) { return idx.auditKey[a.id] === p.key; })
+    .sort(function (a, b) { return a.audit_date === b.audit_date ? Number(b.id) - Number(a.id) : (a.audit_date < b.audit_date ? 1 : -1); });
+  var ids = {}; audits.forEach(function (a) { ids[a.id] = true; });
+  var issues = rows_('Issues').filter(function (i) {
+    return String(i.audit_ids || i.audit_id || '').split(',').some(function (id) { return ids[id.trim()]; });
+  }).map(issueRowOut_);
+  var byPlan = {}, win = auditWindow_(), today = todayBkk(), nowMin = minOfDay_(nowIso());
+  rows_('Audits').forEach(function (a) { if (a.plan_id) (byPlan[a.plan_id] = byPlan[a.plan_id] || []).push(a); });
+  var plans = rows_('Plans').filter(function (pl) {
+    return idx.vis.indexOf(pl.workshop) >= 0 && pl.cancelled !== 'true' && personKey_(pl.workshop, pl.employee_code, pl.employee_name) === p.key;
+  }).sort(function (a, b) { return a.planned_date < b.planned_date ? 1 : -1; }).slice(0, 60).map(function (pl) { return planOut_(pl, byPlan, today, nowMin, win); });
+  return { person: r, audits: audits.map(auditRowOut_), issues: issues, plans: plans, today: today };
+};
+
 // ===== Plan.gs =====
 /**
  * Monthly PJO plan: import from the paper plan form (Excel / PDF are read in the browser and sent as rows),

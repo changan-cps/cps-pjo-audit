@@ -91,8 +91,8 @@
     });
   }
 
-  var NAV = [['#/', 'Dashboard'], ['#/calendar', 'ปฏิทินแผนตรวจ'], ['#/plans', 'แผนและรายการตรวจ PJO'], ['#/start', 'เริ่มตรวจ PJO'], ['#/issues', 'ติดตามปัญหา'],
-    ['#/signatures', 'รายการรอลงนาม'], ['#/standards', 'จัดการแม่แบบและมาตรฐาน'], ['#/reports', 'รายงานและ Export']];
+  var NAV = [['#/', '1. ปฏิทินแผนตรวจ'], ['#/plans', '2. แผนตรวจ / นำเข้าแผน'], ['#/standards', '3. แม่แบบและมาตรฐาน'], ['#/people', '4. รายการตรวจรายบุคคล'],
+    ['#/issues', '5. ปัญหาที่ต้องตามต่อ'], ['#/start', 'เริ่มตรวจ (นอกแผน)'], ['#/signatures', 'รายการรอลงนาม'], ['#/dashboard', 'Dashboard'], ['#/reports', 'รายงานและ Export']];
   function shell() {
     app.textContent = '';
     var side = h('aside', { class: 'side', onclick: function (e) { if (e.target.tagName === 'A') side.classList.remove('open'); } },
@@ -143,9 +143,11 @@
     var path = location.hash.split('?')[0] || '#/';
     var m;
     window.scrollTo(0, 0);
-    if (path === '#/' || path === '#' || path === '') { setNav('#/'); return dashboard(main); }
+    if (path === '#/' || path === '#' || path === '' || path === '#/calendar') { setNav('#/'); return calendar(main); }
+    if (path === '#/dashboard') { setNav('#/dashboard'); return dashboard(main); }
+    if (path === '#/people') { setNav('#/people'); return people(main); }
+    if (path === '#/person') { setNav('#/people'); return person(main); }
     if (path === '#/plans') { setNav('#/plans'); return plans(main); }
-    if (path === '#/calendar') { setNav('#/calendar'); return calendar(main); }
     if (path === '#/start') { setNav('#/start'); return startAudit(main); }
     if ((m = /^#\/audit\/(\d+)$/.exec(path))) { setNav('#/start'); return openAudit(main, m[1]); }
     if (path === '#/issues') { setNav('#/issues'); return issues(main); }
@@ -168,7 +170,7 @@
     PJO.get('dashboard', { workshop: p.workshop }).then(function (d) {
       main.textContent = '';
       main.append(pagehead('Dashboard', 'ข้อมูลจริงจากการตรวจในระบบ ไม่มีคะแนนรวม PJO', h('a', { class: 'btn primary', href: '#/start' }, '+ เริ่มตรวจ PJO')),
-        wsFilter(p.workshop, function (e) { go('#/' + qs({ workshop: e.target.value })); }),
+        wsFilter(p.workshop, function (e) { go('#/dashboard' + qs({ workshop: e.target.value })); }),
         h('h2', { text: 'แผนตรวจเดือนนี้' }),
         h('div', { class: 'tiles' },
           d.plan_total ? tile(d.plan_done + ' / ' + d.plan_total, 'ตรวจและลงนามครบ / แผน', '#/plans') : tile('–', 'ยังไม่มีแผนตรวจเดือนนี้ จึงไม่คำนวณความสำเร็จตามแผน'),
@@ -307,6 +309,7 @@
       var hol = {}; d.holidays.forEach(function (x) { hol[x.date] = x.name; });
       var byDay = {}; d.plans.forEach(function (pl) { (byDay[pl.planned_date] = byDay[pl.planned_date] || []).push(pl); });
       var right = h('div', { class: 'btnrow' },
+        d.can_plan.length ? h('a', { class: 'btn', href: PLAN_TEMPLATE, target: '_blank', rel: 'noopener' }, '⬇ แบบฟอร์มแผน (Excel)') : null,
         d.can_plan.length ? h('button', { type: 'button', class: 'btn primary', onclick: function () { importPlans(p); } }, 'นำเข้าแผน (Excel / PDF)') : null,
         h('button', { type: 'button', class: 'btn', onclick: function () { holidayDialog(month.slice(0, 4), PJO.route); } }, 'วันหยุดโรงงาน'));
       var w = d.window, sum = d.summary;
@@ -335,9 +338,72 @@
               h('span', { class: 'pchip-st2', text: pl.state.label + (pl.state.timing && pl.state.timing.minutes !== undefined ? ' · ' + pl.state.timing.start_hm + '–' + pl.state.timing.end_hm : '') }));
           })));
       }
+      if (month === d.today.slice(0, 7)) main.append(todayPanel(d.plans.filter(function (pl) { return pl.planned_date === d.today; })));
       if (!d.plans.length) main.append(h('div', { class: 'notice info', style: 'margin-bottom:12px' }, 'ยังไม่มีแผนตรวจเดือนนี้ — กด "นำเข้าแผน (Excel / PDF)" เพื่อนำเข้าแบบฟอร์มแผนงานรายเดือน'));
       main.append(grid);
     });
+  }
+
+  // ---------------------------------------------------------------- today's audits (top of the calendar)
+  var PLAN_TEMPLATE = 'https://changan-cps.github.io/cps-pjo-audit/PJO-Plan-template.xlsx';
+  function todayPanel(list) {
+    var card = h('div', { class: 'card today-card' }, h('h2', { style: 'margin-top:0', text: 'ตรวจวันนี้ · ' + PJO.fmtDate(PJO.today()) + (list.length ? ' (' + list.length + ' จุด)' : '') }));
+    if (!list.length) { card.append(h('p', { class: 'muted', style: 'margin:0', text: 'วันนี้ไม่มีแผนตรวจ' })); return card; }
+    card.append(h('div', { class: 'today-list' }, list.map(function (pl) {
+      var a = (pl.state.audits || [])[0];
+      return h('div', { class: 'today-item c-' + pl.state.color },
+        h('div', null, h('b', { text: pl.station }), ' · ', pl.workshop + (pl.team_name ? ' / ' + pl.team_name : ''), pl.level ? ' · ระดับ ' + pl.level : '',
+          h('div', { text: pl.employee_name || pl.employee_code || '' }), h('small', { class: 'muted', text: pl.state.label })),
+        a ? h('a', { class: 'btn', href: '#/audit/' + a.id }, a.status === 'completed' ? 'ดูผลตรวจ' : 'ตรวจต่อ →')
+          : h('button', { type: 'button', class: 'btn primary', onclick: function () { startFromPlan(pl); } }, 'เริ่มตรวจ →'));
+    })));
+    return card;
+  }
+
+  // ---------------------------------------------------------------- 4. audits per person
+  function people(main) {
+    var p = q();
+    loading(main);
+    PJO.get('people', { workshop: p.workshop, q: p.q }).then(function (d) {
+      main.textContent = '';
+      var search = function () { go('#/people' + qs({ workshop: val('wsf'), q: val('pq') })); };
+      main.append(pagehead('รายการตรวจรายบุคคล', 'พนักงานทุกคนที่อยู่ในแผนหรือเคยถูกตรวจ · กดชื่อเพื่อดูประวัติการตรวจ'),
+        h('div', { class: 'filters' }, wsFilter(p.workshop, search),
+          h('div', null, h('label', { for: 'pq', text: 'ค้นหา ชื่อ / รหัส / ทีม / ตำแหน่ง' }), h('input', { id: 'pq', type: 'search', value: p.q || '', onkeydown: function (e) { if (e.key === 'Enter') search(); } })),
+          h('div', { style: 'align-self:end' }, h('button', { type: 'button', class: 'btn', onclick: search }, 'ค้นหา'))),
+        table(['พนักงาน', 'Workshop', 'ทีม', 'ตำแหน่งงาน', 'ตรวจครบ / ทั้งหมด', 'ตรวจล่าสุด', 'ปัญหาเปิด', 'แผนถัดไป'], d.people.map(function (r) {
+          return [h('a', { href: '#/person' + qs({ key: r.key }) }, h('b', { text: r.name || r.code }), r.code && r.name ? h('div', { class: 'muted', text: r.code }) : null),
+            r.workshop, r.team, r.stations.join(', '), r.completed + ' / ' + r.audits,
+            r.last_date ? h('span', null, PJO.fmtDate(r.last_date), h('div', null, PJO.badge('b-' + r.last_status, r.last_status_th))) : '–',
+            r.open_issues ? PJO.badge('b-major', String(r.open_issues)) : '0', r.next_plan ? PJO.fmtDate(r.next_plan) : '–'];
+        }), 'ยังไม่มีพนักงานในแผนหรือการตรวจ'));
+    });
+  }
+  function person(main) {
+    var p = q();
+    loading(main);
+    PJO.get('person', { key: p.key }).then(function (d) {
+      var r = d.person;
+      main.textContent = '';
+      main.append(pagehead(r.name || r.code, [r.code, r.workshop, r.team, r.stations.join(', ')].filter(Boolean).join(' · '), h('a', { class: 'btn', href: '#/people' }, '← รายการทั้งหมด')),
+        h('div', { class: 'tiles' }, tile(String(r.audits), 'ครั้งที่ตรวจ'), tile(String(r.completed), 'ตรวจและลงนามครบ'),
+          tile(String(r.open_issues), 'ปัญหาที่ยังเปิด', null, r.open_issues ? 'alert' : ''), tile(r.next_plan ? PJO.fmtDate(r.next_plan) : '–', 'แผนตรวจถัดไป')),
+        h('div', { class: 'card' }, h('h2', { style: 'margin-top:0', text: 'ประวัติการตรวจ' }),
+          table(['เลข Audit', 'วันที่', 'ตำแหน่งงาน', 'ผู้ตรวจ', 'Rev', 'สถานะ', ''], d.audits.map(function (a) {
+            return [auditLink(a), PJO.fmtDate(a.audit_date), a.station, a.auditor, a.revision, PJO.badge('b-' + a.status, a.status_th),
+              a.archived ? '' : h('a', { class: 'btn small', href: '#/print/' + a.id }, 'พิมพ์')];
+          }), 'ยังไม่เคยถูกตรวจ')),
+        h('div', { class: 'card' }, h('h2', { style: 'margin-top:0', text: 'ปัญหาที่พบ' }),
+          table(['Issue', 'ประเภท', 'รายละเอียด', 'ผู้รับผิดชอบ', 'Due', 'สถานะ'], d.issues.map(function (i) {
+            return [issueLink(i), i.type_th, i.title, i.owner_name || i.owner, i.due_date ? PJO.fmtDate(i.due_date) : '–', h('span', null, gbrBadge(i.gbr), ' ', i.status_th)];
+          }), 'ไม่พบปัญหา')),
+        h('div', { class: 'card' }, h('h2', { style: 'margin-top:0', text: 'แผนตรวจ' }),
+          table(['วันที่แผน', 'ตำแหน่งงาน', 'ระดับ', 'สถานะ', ''], d.plans.map(function (pl) {
+            var a = (pl.state.audits || [])[0];
+            return [PJO.fmtDate(pl.planned_date), pl.station, pl.level, stateChip(pl.state),
+              a ? h('a', { class: 'btn small', href: '#/audit/' + a.id }, 'เปิด') : pl.planned_date === d.today ? h('button', { type: 'button', class: 'btn small primary', onclick: function () { startFromPlan(pl); } }, 'เริ่มตรวจ') : ''];
+          }), 'ไม่มีแผน')));
+    }, function () { main.textContent = ''; main.append(h('div', { class: 'notice err', text: 'ไม่พบข้อมูลพนักงานคนนี้' })); });
   }
 
   // ---------------------------------------------------------------- plans & audit list
@@ -362,6 +428,7 @@
       });
       main.append(pagehead('แผนและรายการตรวจ PJO', null, h('div', { class: 'btnrow' },
           canPlan.length ? h('button', { type: 'button', class: 'btn', onclick: function () { importPlans(p); } }, 'นำเข้าแผน (Excel / PDF)') : null,
+          h('a', { class: 'btn', href: PLAN_TEMPLATE, target: '_blank', rel: 'noopener' }, '⬇ แบบฟอร์มแผน (Excel)'),
           h('a', { class: 'btn', href: '#/calendar' + qs({ month: month, workshop: p.workshop }) }, 'ดูปฏิทิน'),
           h('a', { class: 'btn primary', href: '#/start' }, '+ เริ่มตรวจ PJO'))),
         h('div', { class: 'filters' }, wsFilter(p.workshop, function (e) { go('#/plans' + qs({ workshop: e.target.value, month: month })); }),
@@ -505,7 +572,7 @@
         h('div', { style: 'align-self:end' }, h('button', { class: 'btn primary', type: 'button', onclick: function () {
           go('#/issues' + qs({ workshop: val('iw'), team: val('it'), owner: val('io'), status: val('is'), gbr: val('ig'), type: val('ity'), due: val('id'), q: val('iq'), repeat: val('ic_repeat') ? '1' : '', mine: val('ic_mine') ? '1' : '' }));
         } }, 'กรอง')));
-      main.append(pagehead('ติดตามปัญหา', 'ปัญหาจากทั้ง 4 ตาราง · Open → Assigned → In Progress → Pending Verification → Closed',
+      main.append(pagehead('ปัญหาที่ต้องตามต่อ', 'ดึงจากข้อที่ผิดปกติหรือพบปัญหาในฟอร์ม PJO ทั้ง 4 ตาราง · Open → Assigned → In Progress → Pending Verification → Closed',
         h('button', { class: 'btn', type: 'button', onclick: function () { PJO.exportIssues(p); } }, 'Export Excel')), f,
         table(['Issue ID', 'Workshop / Team', 'Station', 'ระยะ · ข้อ', 'ประเภท', 'รายละเอียด', 'ผู้รับผิดชอบ', 'Due Date', 'สถานะ', 'G/B/R', 'ต้นทาง'], d.issues.map(function (i) {
           return [issueLink(i), h('span', null, i.workshop, i.team_name ? h('br') : null, i.team_name ? h('small', { text: i.team_name }) : null), i.station, (i.sheet || '').toUpperCase() + ' · ' + i.item_code, i.type_th, i.title,
